@@ -10,7 +10,8 @@ import (
 	"github.com/zorvok-dev/zorvok/engines/cocoapods/installer"
 )
 
-// runInstall implements `zorvok install [--native [--source <url> ...]] [pod-install-flags...]`.
+// runInstall implements
+// `zorvok install [--native [--source <url> ...] [--no-registry]] [pod-install-flags...]`.
 //
 // By default this delegates entirely to `pod install` (ADR 0002 Phase
 // 1-2) — the default is unchanged by Milestone 6. --native opts in to
@@ -21,18 +22,34 @@ import (
 // declared anywhere in the Podfile, without ever writing to it. This is
 // opt-in, not default, per ADR 0002's "ships behind a flag... before
 // becoming default."
+//
+// Automatic federation (ADR 0008): with --native and no explicit
+// --source, the configured registry_url is automatically added as a
+// source — but only if registry_url was actually set by the user
+// (zorvok config set registry_url ...), never the bundled local-dev
+// default nobody configured. --no-registry opts back out per invocation
+// even when a registry is configured. Either way, ADR 0007's ambiguity
+// refusal still applies unconditionally — automatic federation never
+// bypasses it.
 func runInstall(out, errOut io.Writer, args []string) int {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return exitErr(errOut, "determine working directory: %v", err)
 	}
 
-	native, sources, rest, err := parseInstallArgs(args)
+	native, sources, noRegistry, rest, err := parseInstallArgs(args)
 	if err != nil {
 		return exitErr(errOut, "%v", err)
 	}
 
 	if native {
+		if len(sources) == 0 && !noRegistry {
+			if url, explicit, err := registryURLExplicit(); err != nil {
+				return exitErr(errOut, "%v", err)
+			} else if explicit {
+				sources = append(sources, url+"/cdn/")
+			}
+		}
 		if err := installer.InstallNative(out, errOut, cwd, sources); err != nil {
 			return reportDelegationError(errOut, err)
 		}
@@ -45,20 +62,22 @@ func runInstall(out, errOut io.Writer, args []string) int {
 	return 0
 }
 
-// parseInstallArgs splits out --native and --source <url> (repeatable);
-// everything else passes through unchanged to the delegated `pod
-// install` path. --source is only meaningful with --native (the
-// delegated path has no mechanism to use it at all — that's the entire
-// reason Milestone 6 exists, see ADR 0004) and is rejected otherwise,
-// rather than silently ignored.
-func parseInstallArgs(args []string) (native bool, sources []string, rest []string, err error) {
+// parseInstallArgs splits out --native, --source <url> (repeatable), and
+// --no-registry; everything else passes through unchanged to the
+// delegated `pod install` path. --source/--no-registry are only
+// meaningful with --native (the delegated path has no mechanism to use
+// them at all — that's the entire reason Milestone 6 exists, see
+// ADR 0004) and are rejected otherwise, rather than silently ignored.
+func parseInstallArgs(args []string) (native bool, sources []string, noRegistry bool, rest []string, err error) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--native":
 			native = true
+		case "--no-registry":
+			noRegistry = true
 		case "--source":
 			if i+1 >= len(args) {
-				return false, nil, nil, fmt.Errorf("--source requires a URL argument")
+				return false, nil, false, nil, fmt.Errorf("--source requires a URL argument")
 			}
 			i++
 			sources = append(sources, args[i])
@@ -67,9 +86,12 @@ func parseInstallArgs(args []string) (native bool, sources []string, rest []stri
 		}
 	}
 	if !native && len(sources) > 0 {
-		return false, nil, nil, fmt.Errorf("--source requires --native (the delegated `pod install` path has no mechanism to use extra sources — see ADR 0004)")
+		return false, nil, false, nil, fmt.Errorf("--source requires --native (the delegated `pod install` path has no mechanism to use extra sources — see ADR 0004)")
 	}
-	return native, sources, rest, nil
+	if !native && noRegistry {
+		return false, nil, false, nil, fmt.Errorf("--no-registry requires --native (automatic registry federation only applies to the native installer — see ADR 0008)")
+	}
+	return native, sources, noRegistry, rest, nil
 }
 
 func runUpdate(out, errOut io.Writer, args []string) int {

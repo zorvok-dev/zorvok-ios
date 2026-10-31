@@ -45,7 +45,7 @@ func commands() []command {
 		{"init", "Create a .zorvok.yml project config in the current directory", runInit, true},
 		{"config", "View or change Zorvok configuration", runConfig, true},
 		{"doctor", "Diagnose the local Zorvok/CocoaPods environment", runDoctor, true},
-		{"install", "Install dependencies from the Podfile (delegates to `pod install`; --native [--source <url>] opts in to Zorvok's own installer)", runInstall, true},
+		{"install", "Install dependencies from the Podfile (delegates to `pod install`; --native [--source <url>] [--no-registry] opts in to Zorvok's own installer, auto-federating a configured registry_url)", runInstall, true},
 		{"update", "Update installed dependencies (delegates to `pod update`)", runUpdate, true},
 		{"lib lint", "Validate a podspec (delegates to `pod lib lint`)", runLibLint, true},
 		{"login", "Authenticate with the Zorvok registry", runLogin, true},
