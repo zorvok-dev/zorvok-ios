@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zorvok-dev/zorvok/engines/cocoapods/installer"
+	"github.com/zorvok-dev/zorvok-ios/engines/cocoapods/installer"
 )
 
 const fixturesDir = "../../../tests/fixtures"

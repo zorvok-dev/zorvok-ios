@@ -15,8 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/zorvok-dev/zorvok/engines/cocoapods/podspec"
-	"github.com/zorvok-dev/zorvok/internal/registry"
+	"github.com/zorvok-dev/zorvok-ios/engines/cocoapods/podspec"
+	"github.com/zorvok-dev/zorvok-ios/internal/registry"
 )
 
 // Options configures a single `trunk push` run.

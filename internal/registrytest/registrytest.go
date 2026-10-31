@@ -1,7 +1,7 @@
 // Package registrytest starts a real zorvok-registry binary as a
 // subprocess for tests, instead of importing the registry server's Go
 // packages directly — those now live in a separate repository
-// (zorvok-dev/zorvok-registry, zorvok ADR 0009), so cross-repo Go
+// (zorvok-dev/zorvok-registry-ios, zorvok ADR 0009), so cross-repo Go
 // imports aren't possible any more. This mirrors the existing pattern
 // of testing against a real `pod`/`git` binary on PATH: skip, don't
 // fail, when the binary isn't available.
@@ -44,7 +44,7 @@ func (s *Server) snapshot() string {
 func RequireBinary(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("zorvok-registry"); err != nil {
-		t.Skip("skipping: no `zorvok-registry` binary on PATH (build it from zorvok-dev/zorvok-registry and add it to PATH)")
+		t.Skip("skipping: no `zorvok-registry` binary on PATH (build it from zorvok-dev/zorvok-registry-ios and add it to PATH)")
 	}
 }
 

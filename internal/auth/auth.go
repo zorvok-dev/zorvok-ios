@@ -16,7 +16,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/zorvok-dev/zorvok/internal/config"
+	"github.com/zorvok-dev/zorvok-ios/internal/config"
 )
 
 // Credentials holds the locally stored session for one registry host.

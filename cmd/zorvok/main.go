@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"github.com/zorvok-dev/zorvok/internal/cli"
+	"github.com/zorvok-dev/zorvok-ios/internal/cli"
 )
 
 func main() {

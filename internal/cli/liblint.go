@@ -4,7 +4,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/zorvok-dev/zorvok/engines/cocoapods/podspec"
+	"github.com/zorvok-dev/zorvok-ios/engines/cocoapods/podspec"
 )
 
 func runLibLint(out, errOut io.Writer, args []string) int {

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/zorvok-dev/zorvok/internal/registrytest"
+	"github.com/zorvok-dev/zorvok-ios/internal/registrytest"
 )
 
 // newTestRegistry starts a real zorvok-registry subprocess (zorvok-dev/
