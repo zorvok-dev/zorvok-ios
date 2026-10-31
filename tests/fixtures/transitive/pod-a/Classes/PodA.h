@@ -1,0 +1,2 @@
+@interface PodA : NSObject
+@end

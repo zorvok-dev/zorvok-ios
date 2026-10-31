@@ -1,0 +1,12 @@
+platform :ios, '13.0'
+
+target 'AppOne' do
+  use_frameworks!
+  pod 'PodA', :path => '../../transitive/pod-a'
+end
+
+target 'AppTwo' do
+  use_frameworks!
+  pod 'PodA', :path => '../../transitive/pod-a'
+  pod 'PodB', :path => '../../transitive/pod-b'
+end

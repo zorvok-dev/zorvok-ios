@@ -16,7 +16,23 @@ Status key: ✅ done · 🚧 in progress · ⬜ not started
 ## Milestone 2 — CocoaPods compatibility 🚧
 `zorvok install`, `zorvok update`, `zorvok lib lint` are implemented, delegating to real `pod install`/`pod update`/`pod lib lint` (ADR 0002, Phase 1) via `engines/cocoapods/{adapter,installer,podspec}`. A compatibility test (`engines/cocoapods/compatibility`) runs a real, unmodified `pod install` end-to-end — against actual CocoaPods, not a mock — confirming the Podfile is never touched, `Podfile.lock` gets the expected sections, and `Pods/`/`.xcworkspace` are produced.
 
-**Not yet covered** — the "CocoaPods compatible" claim in ARCHITECTURE.md §6 still requires fixtures for: transitive dependencies, subspecs, git dependencies, XCFrameworks, resource bundles, multi-target projects, and an existing hand-authored `Podfile.lock`. Current coverage is one local-path dependency fixture, chosen deliberately because it's hermetic (no network, no real Xcode.app build) — broader coverage, especially git-based deps, needs network access in CI and is the next increment within this milestone, not a new one. `engines/cocoapods/podfile`/`podspec` parsing (via `pod ipc`) for federation use is deferred to Milestone 5, since Phase 1 delegation doesn't need it yet.
+**Compatibility fixture coverage** (all run against real, installed CocoaPods — no mocking — and all hermetic: local-path and file:// git repos generated at test time, no network access, no real Xcode.app build, only the `xcodeproj` gem):
+
+| Surface (brief §10) | Fixture | Status |
+|---|---|---|
+| Simple Podfile | `tests/fixtures/local-pod` + `simple-project` | ✅ |
+| Multiple dependencies | `tests/fixtures/transitive` (positive case) | ✅ |
+| Transitive dependencies | `tests/fixtures/transitive` — both the positive case and a negative case proving an undeclared local dependency fails resolution rather than being silently skipped | ✅ |
+| Subspecs | `tests/fixtures/subspecs` — verifies the undeclared subspec's files never reach the generated Pods project | ✅ |
+| Git dependencies | `tests/fixtures/git-dependency` — repo generated and tagged at test time, installed via `file://` | ✅ |
+| Resource bundles | `tests/fixtures/resource-bundle` — verifies a real `com.apple.product-type.bundle` target is generated | ✅ |
+| Multiple Xcode targets | `tests/fixtures/multi-target` — verifies per-target `Pods-<Target>` integration | ✅ |
+| Existing `Podfile.lock` (no drift on reinstall) | reuses `simple-project` | ✅ (`TestReinstallIsIdempotent`) |
+| Local path dependencies | covered by every fixture above | ✅ |
+| Binary frameworks / XCFrameworks | — | ⬜ not yet built |
+| An existing hand-authored `Podfile.lock` from a *different* CocoaPods version/project | — | ⬜ not yet built |
+
+`engines/cocoapods/podfile`/`podspec` parsing (via `pod ipc`) for federation use is deferred to Milestone 5, since Phase 1 delegation doesn't need it yet.
 
 ## Milestone 3 — Public registry
 `registry-server`: metadata API, versioning, search, storage, auth. No publishing from the CLI yet — server-side only, validated via direct API tests.

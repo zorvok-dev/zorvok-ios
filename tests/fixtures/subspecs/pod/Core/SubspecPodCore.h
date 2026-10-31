@@ -1,0 +1,2 @@
+@interface SubspecPodCore : NSObject
+@end

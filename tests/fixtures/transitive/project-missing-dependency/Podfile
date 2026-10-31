@@ -1,0 +1,11 @@
+platform :ios, '13.0'
+
+target 'TransitiveApp' do
+  use_frameworks!
+  # Deliberately omits PodA, which PodB's podspec depends on via
+  # `s.dependency "PodA"`. Local :path dependencies are never
+  # auto-discovered by CocoaPods — this Podfile should fail to resolve,
+  # proving zorvok's delegated install performs real dependency
+  # resolution rather than just copying whatever paths are declared.
+  pod 'PodB', :path => '../pod-b'
+end

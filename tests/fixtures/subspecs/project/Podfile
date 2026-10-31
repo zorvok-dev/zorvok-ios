@@ -1,0 +1,7 @@
+platform :ios, '13.0'
+
+target 'SubspecApp' do
+  use_frameworks!
+  # Only the Core subspec is declared — Extra must not be installed.
+  pod 'SubspecPod/Core', :path => '../pod'
+end

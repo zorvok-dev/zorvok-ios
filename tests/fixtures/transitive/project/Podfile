@@ -1,0 +1,8 @@
+platform :ios, '13.0'
+
+target 'TransitiveApp' do
+  use_frameworks!
+  # Only PodB is declared; PodA must be resolved transitively.
+  pod 'PodB', :path => '../pod-b'
+  pod 'PodA', :path => '../pod-a'
+end
