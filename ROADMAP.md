@@ -10,8 +10,8 @@ Status key: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ Architecture document with component diagram, trade-offs, risks ([ARCHITECTURE.md](ARCHITECTURE.md))
 - ⬜ **Architecture approval** — gate before Milestone 1 starts
 
-## Milestone 1 — CLI skeleton
-`zorvok --version`, `--help`, `doctor`, `config`, `init`. No CocoaPods interaction yet. Establishes `internal/cli`, `internal/config`, `internal/auth` foundations and the Homebrew-distributable binary shape.
+## Milestone 1 — CLI skeleton ✅
+`zorvok --version`, `--help`, `doctor`, `config`, `init`. No CocoaPods interaction yet — `install`/`update`/`search`/`info`/`lib lint`/`login`/`trunk push`/`registry *` all exist as named, documented, explicitly "not implemented yet" commands rather than failing as unknown or silently no-op'ing. Built in Go (module `github.com/zorvok-dev/zorvok`, placeholder path pending a real org), stdlib-only, unit tested.
 
 ## Milestone 2 — CocoaPods compatibility
 `zorvok install`, `zorvok update`, `zorvok lib lint`. Delegates to real `pod install`/`pod update` (ADR 0002, Phase 1). `engines/cocoapods/{podfile,podspec,installer}` built here. Gated by the compatibility test suite in `tests/compatibility` (ARCHITECTURE.md §6) before any "CocoaPods compatible" claim.
