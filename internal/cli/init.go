@@ -36,7 +36,7 @@ func runInit(out, errOut io.Writer, _ []string) int {
 
 	if _, err := os.Stat("Podfile"); err == nil {
 		fmt.Fprintln(out, "detected an existing Podfile — it was not modified.")
-		fmt.Fprintln(out, "note: `zorvok install` is not implemented yet (planned for Milestone 2).")
+		fmt.Fprintln(out, "run `zorvok install` to install dependencies from it.")
 	} else {
 		fmt.Fprintln(out, "no Podfile found in this directory. Zorvok manages existing CocoaPods")
 		fmt.Fprintln(out, "projects; it does not currently scaffold a new Podfile.")

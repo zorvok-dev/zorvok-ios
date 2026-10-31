@@ -119,7 +119,7 @@ func checkAuth() checkResult {
 	}
 	hosts := store.Hosts()
 	if len(hosts) == 0 {
-		return checkResult{statusWarn, "auth", "not logged in to any registry — `zorvok login` is not implemented yet (M4)"}
+		return checkResult{statusWarn, "auth", "not logged in to any registry — run `zorvok login <email>` to publish with `zorvok trunk push`"}
 	}
 	return checkResult{statusOK, "auth", fmt.Sprintf("logged in to: %s", strings.Join(hosts, ", "))}
 }
