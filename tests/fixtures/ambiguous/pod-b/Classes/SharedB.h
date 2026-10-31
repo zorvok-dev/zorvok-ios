@@ -1,0 +1,2 @@
+@interface SharedB : NSObject
+@end

@@ -1,0 +1,11 @@
+{
+  "name": "DefaultSourcePod",
+  "version": "1.0.0",
+  "summary": "Fixture: stands in for the implicit default CDN source in Milestone 6 tests, so the fallback-preservation fix can be verified hermetically.",
+  "homepage": "https://github.com/zorvok-dev/zorvok",
+  "license": "MIT",
+  "authors": {"Zorvok": "dev@example.com"},
+  "source": {"git": "ZORVOK_DEFAULT_SOURCE_POD_GIT_URL", "tag": "1.0.0"},
+  "platforms": {"ios": "13.0"},
+  "source_files": "Classes/**/*.{h,m}"
+}

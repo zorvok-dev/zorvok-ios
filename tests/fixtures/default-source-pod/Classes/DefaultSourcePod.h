@@ -1,0 +1,2 @@
+@interface DefaultSourcePod : NSObject
+@end
