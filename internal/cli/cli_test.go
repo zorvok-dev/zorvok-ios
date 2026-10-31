@@ -54,9 +54,9 @@ func TestUnknownCommand(t *testing.T) {
 }
 
 func TestPlannedCommandIsHonestNotSilent(t *testing.T) {
-	// `login` is a real, named product command with no implementation yet.
+	// `search` is a real, named product command with no implementation yet.
 	// It must say so loudly, never exit 0 as if it had done something.
-	_, errOut, code := run("login")
+	_, errOut, code := run("search")
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
 	}
@@ -66,7 +66,7 @@ func TestPlannedCommandIsHonestNotSilent(t *testing.T) {
 }
 
 func TestPlannedTwoWordCommandIsHonestNotSilent(t *testing.T) {
-	_, errOut, code := run("trunk", "push")
+	_, errOut, code := run("registry", "add")
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
 	}
