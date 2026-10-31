@@ -17,25 +17,41 @@ const defaultRegistryURL = "http://localhost:8080"
 // `zorvok config` resolves any other setting: project (.zorvok.yml) over
 // global (~/.config/zorvok/config.yml) over the local-dev default.
 func registryURL() (string, error) {
-	cwd, err := os.Getwd()
+	url, _, err := registryURLExplicit()
 	if err != nil {
 		return "", err
+	}
+	if url == "" {
+		return defaultRegistryURL, nil
+	}
+	return url, nil
+}
+
+// registryURLExplicit returns the configured registry_url and whether it
+// was actually set by the user (project or global `zorvok config set`),
+// as opposed to falling back to defaultRegistryURL. ADR 0008's automatic
+// federation deliberately only activates on an explicit configuration —
+// never on the bundled local-dev fallback nobody asked for.
+func registryURLExplicit() (url string, explicit bool, err error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", false, err
 	}
 	globalPath, err := config.GlobalPath()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	g, err := config.Load(globalPath)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	p, err := config.Load(config.ProjectPath(cwd))
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	merged := config.Merged(g, p)
 	if v, ok := merged.Get("registry_url"); ok && v != "" {
-		return v, nil
+		return v, true, nil
 	}
-	return defaultRegistryURL, nil
+	return "", false, nil
 }
