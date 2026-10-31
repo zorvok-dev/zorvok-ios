@@ -1,0 +1,2 @@
+@interface LocalPod : NSObject
+@end

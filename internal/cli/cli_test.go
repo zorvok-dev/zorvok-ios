@@ -54,9 +54,19 @@ func TestUnknownCommand(t *testing.T) {
 }
 
 func TestPlannedCommandIsHonestNotSilent(t *testing.T) {
-	// `install` is a real, named product command with no implementation yet.
+	// `login` is a real, named product command with no implementation yet.
 	// It must say so loudly, never exit 0 as if it had done something.
-	_, errOut, code := run("install")
+	_, errOut, code := run("login")
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
+	}
+	if !strings.Contains(errOut, "not implemented yet") {
+		t.Fatalf("expected an explicit not-implemented message, got %q", errOut)
+	}
+}
+
+func TestPlannedTwoWordCommandIsHonestNotSilent(t *testing.T) {
+	_, errOut, code := run("trunk", "push")
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
 	}

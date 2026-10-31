@@ -8,13 +8,15 @@ Status key: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ Define CLI-to-engine interface ([ADR 0002](docs/adr/0002-cocoapods-delegation-strategy.md))
 - ✅ Define registry architecture ([ADR 0003](docs/adr/0003-registry-federation-and-storage.md))
 - ✅ Architecture document with component diagram, trade-offs, risks ([ARCHITECTURE.md](ARCHITECTURE.md))
-- ⬜ **Architecture approval** — gate before Milestone 1 starts
+- ✅ **Architecture approved**
 
 ## Milestone 1 — CLI skeleton ✅
 `zorvok --version`, `--help`, `doctor`, `config`, `init`. No CocoaPods interaction yet — `install`/`update`/`search`/`info`/`lib lint`/`login`/`trunk push`/`registry *` all exist as named, documented, explicitly "not implemented yet" commands rather than failing as unknown or silently no-op'ing. Built in Go (module `github.com/zorvok-dev/zorvok`, placeholder path pending a real org), stdlib-only, unit tested.
 
-## Milestone 2 — CocoaPods compatibility
-`zorvok install`, `zorvok update`, `zorvok lib lint`. Delegates to real `pod install`/`pod update` (ADR 0002, Phase 1). `engines/cocoapods/{podfile,podspec,installer}` built here. Gated by the compatibility test suite in `tests/compatibility` (ARCHITECTURE.md §6) before any "CocoaPods compatible" claim.
+## Milestone 2 — CocoaPods compatibility 🚧
+`zorvok install`, `zorvok update`, `zorvok lib lint` are implemented, delegating to real `pod install`/`pod update`/`pod lib lint` (ADR 0002, Phase 1) via `engines/cocoapods/{adapter,installer,podspec}`. A compatibility test (`engines/cocoapods/compatibility`) runs a real, unmodified `pod install` end-to-end — against actual CocoaPods, not a mock — confirming the Podfile is never touched, `Podfile.lock` gets the expected sections, and `Pods/`/`.xcworkspace` are produced.
+
+**Not yet covered** — the "CocoaPods compatible" claim in ARCHITECTURE.md §6 still requires fixtures for: transitive dependencies, subspecs, git dependencies, XCFrameworks, resource bundles, multi-target projects, and an existing hand-authored `Podfile.lock`. Current coverage is one local-path dependency fixture, chosen deliberately because it's hermetic (no network, no real Xcode.app build) — broader coverage, especially git-based deps, needs network access in CI and is the next increment within this milestone, not a new one. `engines/cocoapods/podfile`/`podspec` parsing (via `pod ipc`) for federation use is deferred to Milestone 5, since Phase 1 delegation doesn't need it yet.
 
 ## Milestone 3 — Public registry
 `registry-server`: metadata API, versioning, search, storage, auth. No publishing from the CLI yet — server-side only, validated via direct API tests.
