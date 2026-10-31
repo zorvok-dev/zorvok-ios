@@ -126,20 +126,34 @@ CocoaPods already ships a machine-readable interface for exactly this purpose: `
 
 ### 2.3 Registry federation model
 
-`zorvok install` resolution order, concretely:
+**Corrected by [ADR 0004](docs/adr/0004-federation-requires-podfile-source-line.md) — the mechanism originally described here for Milestone 5 does not work and was never built.** Keeping the history here rather than deleting it, because the correction is itself the useful artifact.
 
-1. Parse `Podfile` (via `pod ipc podfile-json`) and `Podfile.lock` if present.
-2. For each declared source (explicit `source 'https://...'` lines, or the default), classify it: Zorvok registry, CocoaPods CDN/Specs, or a private/custom registry.
-3. For each dependency, query *every configured source that's eligible for it* — not just the first match — and collect candidate versions **with provenance** (which registry, what checksum).
-4. Apply an explicit, documented precedence policy instead of silent merge:
-   - A pod name that is **registered as owned on the Zorvok registry** always resolves from Zorvok for that name, even if a same-named pod exists on the CocoaPods registry — this is the dependency-confusion guard (brief §9/§4 "never silently replace a package with one from a different registry").
-   - A pod **not present on Zorvok** falls through to CocoaPods CDN, unchanged behavior from today.
-   - Explicit per-pod source pinning in the Podfile (`pod 'Foo', :source => '...'` — already valid CocoaPods syntax) always wins and is never overridden by federation logic.
-   - Conflicting version constraints across sources for the *same* resolved pod are a hard resolution failure, surfaced with both sources named, never a silent pick.
-5. Feed the resolved, provenance-tagged source list into Molinillo (today: via `pod install`'s own source list, synthesized by us; later: via our Ruby shim calling Molinillo directly, §2.2) for the actual version-constraint solving.
-6. Record provenance (registry + checksum) in an **extended** `Podfile.lock` section (`ZORVOK SOURCES` or similar, additive — must not break `pod install` falling back to reading the same lockfile if a developer ever runs plain `pod install` on a Zorvok-managed project) so reinstalls are reproducible and auditable.
+The original plan: feed `pod install` a synthesized, provenance-tagged source list spanning both registries, without touching the Podfile, by some means TBD at the "investigate CocoaPods CDN and Specs repository behavior" step §1.1 called for. When Milestone 5 actually started, that investigation happened for real (not assumed) and falsified the premise:
 
-This is intentionally conservative: we are not trying to out-resolve Molinillo, we're trying to feed it an unambiguous, provenance-tracked source list. The actual constraint-solving algorithm (backtracking SAT-ish resolution) is a solved, hard problem CocoaPods already solved — reinventing it is pure risk with no product value.
+- `pod install` has no CLI flag to add or override spec sources for one invocation.
+- A Specs repo registered globally via `pod repo add` is **not** implicitly searched — confirmed empirically: a Podfile with no `source` line, run against a pod only present in that added repo, fails with CocoaPods' own error *"not added the source repo that hosts the Podspec to your Podfile."*
+- There is no flag to point `pod install` at an alternate Podfile path.
+
+**A source must be declared in the Podfile itself.** There is no way to add one invisibly for a single `pod install` run — full stop, not a workaround-able limitation.
+
+**Current plan**: until Milestone 6 (where Zorvok's own Ruby shim calls `cocoapods-core`/`molinillo` directly instead of going through `pod install`'s own source resolution, per ADR 0002 Phase 3+), using the Zorvok registry requires the same one-line opt-in any CocoaPods private registry already requires today:
+
+```ruby
+source 'https://cdn.cocoapods.org/'
+source 'https://registry.zorvok.dev/cdn'   # one line, added once, like any private spec repo
+```
+
+This is not a Zorvok-specific migration step; it's normal CocoaPods practice, and it doesn't conflict with "no Podfile changes to keep consuming your *existing* CocoaPods dependencies." It does mean Milestone 5, as originally scoped (automatic cross-registry resolution with zero Podfile awareness of Zorvok), is not achievable yet — see ROADMAP.md for the re-scoped version.
+
+Once Zorvok does own resolution (Milestone 6) and can inject sources programmatically, the precedence rules below still apply and are worth keeping as the target design:
+
+- A pod name that is **registered as owned on the Zorvok registry** always resolves from Zorvok for that name, even if a same-named pod exists on the CocoaPods registry — this is the dependency-confusion guard (brief §9/§4 "never silently replace a package with one from a different registry").
+- A pod **not present on Zorvok** falls through to CocoaPods CDN, unchanged behavior from today.
+- Explicit per-pod source pinning in the Podfile (`pod 'Foo', :source => '...'` — already valid CocoaPods syntax) always wins and is never overridden by federation logic.
+- Conflicting version constraints across sources for the *same* resolved pod are a hard resolution failure, surfaced with both sources named, never a silent pick.
+- Provenance (registry + checksum) is recorded in an **extended** `Podfile.lock` section, additive only.
+
+This remains intentionally conservative: not trying to out-resolve Molinillo, just feed it an unambiguous, provenance-tracked source list once Zorvok is in a position to do so at all.
 
 ### 2.4 Zorvok Registry server
 
@@ -206,7 +220,7 @@ No code exists yet in any of these — directories are created empty/stubbed pen
 1. **Podfile.lock byte-fidelity** — our biggest near-term risk. If Zorvok's lockfile writer diverges from `pod install`'s in formatting, key order, or checksum algorithm, a team with mixed `pod`/`zorvok` usage gets spurious diffs and false "drifted" states. Mitigation: golden-file tests against real `pod install` output pinned to specific CocoaPods versions, run in CI, before this ships.
 2. **Resolver semantics drift** once we move off delegated `pod install` (Phase 3+, M6) — different resolution results for the same Podfile depending on whether a user ran `pod install` or `zorvok install` is the worst possible failure mode (silent, hard to debug, erodes trust). Mitigation: Phase 3 ships behind a flag with a large differential test corpus (resolve N real-world Podfiles with both engines, diff the result) before becoming default.
 3. **`pod` / Ruby toolchain availability.** Delegating to `pod install` means Zorvok still requires a working CocoaPods Ruby install during Phases 1-2. `zorvok doctor` must detect, diagnose, and offer to bootstrap this (consistent with the brief's `zorvok doctor` command) — this is a real UX risk if not handled well, since "install Ruby correctly" is itself a classic source of CocoaPods pain.
-4. **Dependency confusion / name collision across registries** (brief §4, §9) — handled architecturally in §2.3 via explicit ownership precedence, but needs a hard security review before Milestone 5 (federation) ships, specifically: can an attacker register a Zorvok package with the same name as a popular CocoaPods pod to hijack resolution for projects that add Zorvok as a source? Current design (Zorvok-owned names always win *only if explicitly declared/pinned*, otherwise first-registered-wins with no silent override of an existing CocoaPods pod of the same name) needs explicit adversarial review, not just the happy-path description above.
+4. **Dependency confusion / name collision across registries** (brief §4, §9) — lower-severity than originally scoped now that Milestone 5 is opt-in-source-line only (ADR 0004): a project only searches the Zorvok registry at all once a developer deliberately adds `source 'https://registry.zorvok.dev/cdn'` to their own Podfile, the same trust decision as adding any CocoaPods private registry today — not something Zorvok can be tricked into doing silently. The harder version of this risk — can a malicious Zorvok package hijack resolution for a name that also exists on CocoaPods, *automatically*, with no explicit per-pod source pin — only becomes live once Milestone 6 gives Zorvok its own resolver and §2.3's precedence rules actually run; that's where the hard adversarial security review belongs, before Milestone 6 ships, not before Milestone 5.
 5. **CDN/infra cost and ownership** for hosting source archives, not just metadata — brief says "evaluate," not "commit to hosting." Initial registry design should support **source-by-reference** (podspec points at a git tag/tarball URL, same as CocoaPods today) as the default, with Zorvok-hosted artifact storage as an *opt-in* enhancement, to avoid an unbounded storage/bandwidth cost commitment in the MVP.
 6. **CocoaPods maintenance-mode status** is double-edged: stable target to integrate against short-term, but means Zorvok inherits sole responsibility for any CocoaPods bugs it surfaces along the way (no upstream to escalate to).
 
