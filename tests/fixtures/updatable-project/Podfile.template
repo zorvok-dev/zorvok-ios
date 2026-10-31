@@ -1,0 +1,9 @@
+platform :ios, '13.0'
+
+target 'UpdatableApp' do
+  use_frameworks!
+  # Branch-tracking (no :tag), so `zorvok install` locks to whatever
+  # commit exists at install time and `zorvok update` is the only thing
+  # that re-resolves to a newer commit on the branch.
+  pod 'UpdatablePod', :git => 'ZORVOK_UPDATABLE_POD_GIT_URL', :branch => 'main'
+end

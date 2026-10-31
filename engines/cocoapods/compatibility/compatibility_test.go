@@ -379,3 +379,93 @@ func TestXCFrameworkDependencyResolves(t *testing.T) {
 		t.Error("expected the host app target to be wired to link against the xcframework via PODS_XCFRAMEWORKS_BUILD_DIR")
 	}
 }
+
+// TestUpdateMovesForwardButInstallStaysLocked is `zorvok update`'s own
+// real compatibility test — until now it only had stub-based unit tests
+// (engines/cocoapods/installer), never verified end-to-end against real
+// CocoaPods like every other command here. The scenario that actually
+// distinguishes `update` from `install`: a branch-tracking git
+// dependency (no :tag, so there's a real "newer commit" for update to
+// move to). Confirmed empirically before writing this test: plain
+// `pod install` never re-resolves a branch-tracking git source once
+// locked — only `pod update` does.
+func TestUpdateMovesForwardButInstallStaysLocked(t *testing.T) {
+	requirePod(t)
+	requireGit(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
+
+	root := t.TempDir()
+	podGitDir := filepath.Join(root, "updatable-pod-git")
+	copyRel(t, root, "updatable-pod")
+	if err := os.Rename(filepath.Join(root, "updatable-pod"), podGitDir); err != nil {
+		t.Fatal(err)
+	}
+
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = podGitDir
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=zorvok-test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=zorvok-test", "GIT_COMMITTER_EMAIL=test@example.com")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+
+	podspecPath := filepath.Join(podGitDir, "UpdatablePod.podspec")
+	content := readFile(t, podspecPath)
+	augmented := strings.ReplaceAll(content, "ZORVOK_UPDATABLE_POD_GIT_URL", "file://"+podGitDir)
+	if err := os.WriteFile(podspecPath, []byte(augmented), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit("init", "-q", "-b", "main")
+	runGit("add", "-A")
+	runGit("commit", "-q", "-m", "v1.0.0")
+
+	copyRel(t, root, "updatable-project")
+	projectDir := filepath.Join(root, "updatable-project")
+	template := readFile(t, filepath.Join(projectDir, "Podfile.template"))
+	podfile := strings.ReplaceAll(template, "ZORVOK_UPDATABLE_POD_GIT_URL", "file://"+podGitDir)
+	if err := os.WriteFile(filepath.Join(projectDir, "Podfile"), []byte(podfile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(projectDir, "Podfile.template")); err != nil {
+		t.Fatal(err)
+	}
+
+	// First install: locks to the commit that exists right now (1.0.0).
+	mustInstall(t, projectDir, nil)
+	lockAfterInstall := readFile(t, filepath.Join(projectDir, "Podfile.lock"))
+	if !strings.Contains(lockAfterInstall, "UpdatablePod (1.0.0)") {
+		t.Fatalf("expected UpdatablePod (1.0.0) after first install:\n%s", lockAfterInstall)
+	}
+
+	// Push a new commit on the same branch bumping the version — a real
+	// "someone published a newer version" scenario.
+	bumped := strings.ReplaceAll(augmented, "1.0.0", "1.1.0")
+	if err := os.WriteFile(podspecPath, []byte(bumped), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", "-A")
+	runGit("commit", "-q", "-m", "v1.1.0")
+
+	// `zorvok install` again must NOT move — it stays locked to what
+	// Podfile.lock already recorded, same as real `pod install`.
+	mustInstall(t, projectDir, nil)
+	lockAfterSecondInstall := readFile(t, filepath.Join(projectDir, "Podfile.lock"))
+	if lockAfterSecondInstall != lockAfterInstall {
+		t.Fatalf("plain `zorvok install` must not move a locked branch-tracking dependency forward, but Podfile.lock changed:\n--- before ---\n%s\n--- after ---\n%s", lockAfterInstall, lockAfterSecondInstall)
+	}
+
+	// `zorvok update` must move forward to the new commit/version.
+	var out, errOut strings.Builder
+	if err := installer.Update(&out, &errOut, projectDir, nil); err != nil {
+		t.Fatalf("Update failed: %v\nstdout:\n%s\nstderr:\n%s", err, out.String(), errOut.String())
+	}
+	lockAfterUpdate := readFile(t, filepath.Join(projectDir, "Podfile.lock"))
+	if !strings.Contains(lockAfterUpdate, "UpdatablePod (1.1.0)") {
+		t.Fatalf("expected UpdatablePod (1.1.0) after `zorvok update`:\n%s", lockAfterUpdate)
+	}
+	if lockAfterUpdate == lockAfterInstall {
+		t.Fatal("Podfile.lock did not change after `zorvok update` — it should have moved to the new commit")
+	}
+}

@@ -11,7 +11,7 @@ Status key: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ **Architecture approved**
 
 ## Milestone 1 — CLI skeleton ✅
-`zorvok --version`, `--help`, `doctor`, `config`, `init`. No CocoaPods interaction yet — `install`/`update`/`search`/`info`/`lib lint`/`login`/`trunk push`/`registry *` all exist as named, documented, explicitly "not implemented yet" commands rather than failing as unknown or silently no-op'ing. Built in Go (module `github.com/zorvok-dev/zorvok-ios` — chosen as a placeholder at the time, later confirmed to match a real `zorvok-dev` GitHub org; see "Publishing this repository" below), stdlib-only, unit tested.
+`zorvok --version`, `--help`, `doctor`, `config`, `init`. At the time, no CocoaPods interaction yet — `install`/`update`/`search`/`info`/`lib lint`/`login`/`trunk push`/`registry *` all existed as named, documented, explicitly "not implemented yet" commands rather than failing as unknown or silently no-op'ing (all are implemented now — see later milestones). Built in Go (module `github.com/zorvok-dev/zorvok-ios` — chosen as a placeholder at the time, later confirmed to match a real `zorvok-dev` GitHub org; see "Publishing this repository" below), stdlib-only, unit tested.
 
 ## Milestone 2 — CocoaPods compatibility 🚧
 `zorvok install`, `zorvok update`, `zorvok lib lint` are implemented, delegating to real `pod install`/`pod update`/`pod lib lint` (ADR 0002, Phase 1) via `engines/cocoapods/{adapter,installer,podspec}`. A compatibility test (`engines/cocoapods/compatibility`) runs a real, unmodified `pod install` end-to-end — against actual CocoaPods, not a mock — confirming the Podfile is never touched, `Podfile.lock` gets the expected sections, and `Pods/`/`.xcworkspace` are produced.
@@ -30,6 +30,7 @@ Status key: ✅ done · 🚧 in progress · ⬜ not started
 | Existing `Podfile.lock` (no drift on reinstall) | reuses `simple-project` | ✅ (`TestReinstallIsIdempotent`) |
 | Local path dependencies | covered by every fixture above | ✅ |
 | Binary frameworks / XCFrameworks | `tests/fixtures/xcframework` — a real `.xcframework` built with `clang` + `xcodebuild -create-xcframework` (no full Xcode project needed); verifies the host app target gets wired to `PODS_XCFRAMEWORKS_BUILD_DIR` | ✅ |
+| `zorvok update` actually updates (vs. `install` staying locked) | `tests/fixtures/updatable-pod` + `updatable-project` — a branch-tracking git dependency; confirmed empirically first that real `pod install` never re-resolves it but `pod update` does, then built `TestUpdateMovesForwardButInstallStaysLocked` to prove `zorvok` matches: install stays locked, update moves to the new commit/version | ✅ |
 | An existing hand-authored `Podfile.lock` from a *different* CocoaPods version/project | — | ⬜ not yet built |
 
 `engines/cocoapods/podfile`/`podspec` parsing (via `pod ipc`) for federation use is deferred to Milestone 5, since Phase 1 delegation doesn't need it yet.
@@ -66,7 +67,7 @@ What's covered, with real tests, not just described:
 
 **What Milestone 5 delivers instead**: using the Zorvok registry is opt-in, via the same one-line `source 'https://...'` a developer would add for any CocoaPods private registry — not a Zorvok-specific migration step. Remaining scope:
 - ⬜ Document the opt-in `source` line workflow (install guide / website docs, Milestone 6).
-- ⬜ `zorvok registry add <url>` / `zorvok registry list` — thin, documented wrappers around `pod repo add`/`pod repo list` with Zorvok-specific guidance (still listed as not-yet-implemented in `zorvok help`).
+- ✅ `zorvok registry list` / `add` / `add-cdn` / `remove` / `update` — thin wrappers around `pod repo list`/`add`/`add-cdn`/`remove`/`update` (`engines/cocoapods/repo`), stub-tested and verified for real against this machine's actual CocoaPods repos (`add-cdn` → appears in `list` → `remove` → gone). `add-cdn` specifically is the correct command for registering a Zorvok registry as a named source, since it speaks the CDN protocol (ADR 0006), not the git-clone one `add` uses.
 - ⬜ `zorvok doctor` check for whether the configured Zorvok registry is present as a Podfile `source` line, to catch the easy "forgot to add the source" mistake with a clear message.
 
 **True automatic, zero-Podfile-touch federation — the original Milestone 5 goal — moves to Milestone 6**, where it's actually achievable: once Zorvok's own resolver controls the source list programmatically, the precedence rules in ADR 0003/ARCHITECTURE.md §2.3 apply for real, and the dependency-confusion adversarial review happens before *that* ships.

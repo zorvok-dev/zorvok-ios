@@ -27,6 +27,7 @@ PROJECTS = [
   ["mixed-federation-project", "MixedApp", ["MixedApp"]],
   ["ambiguous/project", "AmbiguousApp", ["AmbiguousApp"]],
   ["ambiguous/project-pinned", "AmbiguousApp", ["AmbiguousApp"]],
+  ["updatable-project", "UpdatableApp", ["UpdatableApp"]],
 ]
 
 PROJECTS.each do |dir, name, targets|

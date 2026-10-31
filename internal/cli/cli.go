@@ -29,10 +29,12 @@ type plannedCommand struct {
 	milestone string
 }
 
-var plannedCommands = []plannedCommand{
-	{"registry list", "List configured package registries", "Milestone 5"},
-	{"registry add", "Add a package registry", "Milestone 5"},
-}
+// plannedCommands is currently empty — every command named in the
+// original product brief has a real implementation. Kept as a live
+// mechanism (not deleted) since it's exactly what the next genuinely
+// unimplemented command should be listed in, rather than silently
+// falling through to "unknown command".
+var plannedCommands = []plannedCommand{}
 
 func commands() []command {
 	return []command{
@@ -50,6 +52,11 @@ func commands() []command {
 		{"trunk push", "Publish a podspec to the Zorvok registry", runTrunkPush, true},
 		{"search", "Search the configured registry for a package by name", runSearch, true},
 		{"info", "Show details for a package on the configured registry", runInfo, true},
+		{"registry list", "List registered CocoaPods spec sources (delegates to `pod repo list`)", runRegistryList, true},
+		{"registry add", "Register a git-backed spec source (delegates to `pod repo add`)", runRegistryAdd, true},
+		{"registry add-cdn", "Register a CDN-backed spec source, e.g. a Zorvok registry (delegates to `pod repo add-cdn`)", runRegistryAddCDN, true},
+		{"registry remove", "Unregister a spec source (delegates to `pod repo remove`)", runRegistryRemove, true},
+		{"registry update", "Update one or all registered spec sources (delegates to `pod repo update`)", runRegistryUpdate, true},
 	}
 }
 
