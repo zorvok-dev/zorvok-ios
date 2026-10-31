@@ -1,3 +1,10 @@
 # Go
 /bin/
 *.exe
+
+# CocoaPods artifacts produced by running `zorvok install`/`pod install`
+# against the fixtures under tests/fixtures/ — never commit generated
+# installs, only the fixture sources and (if added later) golden lockfiles.
+tests/fixtures/**/Pods/
+tests/fixtures/**/*.xcworkspace/
+tests/fixtures/**/Podfile.lock

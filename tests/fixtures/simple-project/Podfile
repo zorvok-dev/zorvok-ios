@@ -1,0 +1,6 @@
+platform :ios, '13.0'
+
+target 'SimpleApp' do
+  use_frameworks!
+  pod 'LocalPod', :path => '../local-pod'
+end

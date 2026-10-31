@@ -30,11 +30,8 @@ type plannedCommand struct {
 }
 
 var plannedCommands = []plannedCommand{
-	{"install", "Install dependencies from the Podfile", "Milestone 2"},
-	{"update", "Update installed dependencies", "Milestone 2"},
-	{"search", "Search for a package by name", "Milestone 2"},
-	{"info", "Show details for a package", "Milestone 2"},
-	{"lib lint", "Validate a podspec", "Milestone 2"},
+	{"search", "Search for a package by name", "Milestone 3"},
+	{"info", "Show details for a package", "Milestone 3"},
 	{"login", "Authenticate with the Zorvok registry", "Milestone 4"},
 	{"trunk push", "Publish a podspec to the Zorvok registry", "Milestone 4"},
 	{"registry list", "List configured package registries", "Milestone 5"},
@@ -50,6 +47,9 @@ func commands() []command {
 		{"init", "Create a .zorvok.yml project config in the current directory", runInit, true},
 		{"config", "View or change Zorvok configuration", runConfig, true},
 		{"doctor", "Diagnose the local Zorvok/CocoaPods environment", runDoctor, true},
+		{"install", "Install dependencies from the Podfile (delegates to `pod install`)", runInstall, true},
+		{"update", "Update installed dependencies (delegates to `pod update`)", runUpdate, true},
+		{"lib lint", "Validate a podspec (delegates to `pod lib lint`)", runLibLint, true},
 	}
 }
 
@@ -60,16 +60,34 @@ func Execute(args []string, out, errOut io.Writer) int {
 		return 1
 	}
 
-	name := args[0]
-	rest := args[1:]
-
-	switch name {
+	switch args[0] {
 	case "--help", "-h", "help":
 		printHelp(out)
 		return 0
 	case "--version", "-v", "version":
-		return runVersion(out, errOut, rest)
+		return runVersion(out, errOut, args[1:])
 	}
+
+	// Two-word commands (`lib lint`, `trunk push`, `registry add`) are
+	// matched before single-word ones so `zorvok lib lint` doesn't get
+	// swallowed by a bare `lib` lookup.
+	if len(args) >= 2 {
+		twoWord := args[0] + " " + args[1]
+		rest := args[2:]
+		for _, c := range commands() {
+			if c.name == twoWord && c.run != nil {
+				return c.run(out, errOut, rest)
+			}
+		}
+		for _, p := range plannedCommands {
+			if p.name == twoWord {
+				return reportPlanned(errOut, twoWord, p.milestone)
+			}
+		}
+	}
+
+	name := args[0]
+	rest := args[1:]
 
 	for _, c := range commands() {
 		if c.name == name && c.run != nil {
@@ -79,14 +97,18 @@ func Execute(args []string, out, errOut io.Writer) int {
 
 	for _, p := range plannedCommands {
 		if p.name == name {
-			fmt.Fprintf(errOut, "zorvok %s: not implemented yet (planned for %s)\n", name, p.milestone)
-			fmt.Fprintf(errOut, "see ROADMAP.md for status: https://github.com/zorvok-dev/zorvok/blob/main/ROADMAP.md\n")
-			return 1
+			return reportPlanned(errOut, name, p.milestone)
 		}
 	}
 
 	fmt.Fprintf(errOut, "zorvok: unknown command %q\n\n", name)
 	printHelp(errOut)
+	return 1
+}
+
+func reportPlanned(errOut io.Writer, name, milestone string) int {
+	fmt.Fprintf(errOut, "zorvok %s: not implemented yet (planned for %s)\n", name, milestone)
+	fmt.Fprintf(errOut, "see ROADMAP.md for status: https://github.com/zorvok-dev/zorvok/blob/main/ROADMAP.md\n")
 	return 1
 }
 
