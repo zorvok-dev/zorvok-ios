@@ -102,6 +102,99 @@ func TestGetPackageNotFound(t *testing.T) {
 	}
 }
 
+func TestMe(t *testing.T) {
+	client, srv := newTestRegistry(t)
+	ctx := context.Background()
+	token := registerAndVerify(t, client, srv, "dev@example.com")
+
+	account, err := client.Me(ctx, token)
+	if err != nil {
+		t.Fatalf("Me: %v", err)
+	}
+	if account.Email != "dev@example.com" || !account.Verified {
+		t.Fatalf("unexpected account: %+v", account)
+	}
+}
+
+func TestMeWithoutSessionIsAPIError(t *testing.T) {
+	client, _ := newTestRegistry(t)
+	_, err := client.Me(context.Background(), "not-a-real-token")
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != 401 {
+		t.Fatalf("got %v, want *APIError with status 401", err)
+	}
+}
+
+func TestAddAndRemoveOwner(t *testing.T) {
+	client, srv := newTestRegistry(t)
+	ctx := context.Background()
+	aliceToken := registerAndVerify(t, client, srv, "alice@example.com")
+	registerAndVerify(t, client, srv, "bob@example.com")
+
+	if _, err := client.PublishVersion(ctx, aliceToken, "Alamofire", "1.0.0", `{"name":"Alamofire","version":"1.0.0"}`, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := client.AddOwner(ctx, aliceToken, "Alamofire", "bob@example.com"); err != nil {
+		t.Fatalf("AddOwner: %v", err)
+	}
+	pkg, err := client.GetPackage(ctx, "Alamofire")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pkg.Owners) != 2 {
+		t.Fatalf("expected 2 owners after AddOwner, got %v", pkg.Owners)
+	}
+
+	if err := client.RemoveOwner(ctx, aliceToken, "Alamofire", "bob@example.com"); err != nil {
+		t.Fatalf("RemoveOwner: %v", err)
+	}
+	pkg, err = client.GetPackage(ctx, "Alamofire")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pkg.Owners) != 1 || pkg.Owners[0] != "alice@example.com" {
+		t.Fatalf("expected only alice to remain an owner, got %v", pkg.Owners)
+	}
+}
+
+func TestRemoveLastOwnerIsAPIError(t *testing.T) {
+	client, srv := newTestRegistry(t)
+	ctx := context.Background()
+	aliceToken := registerAndVerify(t, client, srv, "alice@example.com")
+
+	if _, err := client.PublishVersion(ctx, aliceToken, "Alamofire", "1.0.0", `{"name":"Alamofire","version":"1.0.0"}`, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	err := client.RemoveOwner(ctx, aliceToken, "Alamofire", "alice@example.com")
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != 409 {
+		t.Fatalf("got %v, want *APIError with status 409 (cannot remove the last owner)", err)
+	}
+}
+
+func TestDeprecate(t *testing.T) {
+	client, srv := newTestRegistry(t)
+	ctx := context.Background()
+	token := registerAndVerify(t, client, srv, "dev@example.com")
+
+	if _, err := client.PublishVersion(ctx, token, "Alamofire", "1.0.0", `{"name":"Alamofire","version":"1.0.0"}`, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Deprecate(ctx, token, "Alamofire", "use Alamofire2 instead"); err != nil {
+		t.Fatalf("Deprecate: %v", err)
+	}
+
+	pkg, err := client.GetPackage(ctx, "Alamofire")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pkg.Deprecated || pkg.DeprecationMessage != "use Alamofire2 instead" {
+		t.Fatalf("unexpected package after deprecation: %+v", pkg)
+	}
+}
+
 func TestSearch(t *testing.T) {
 	client, srv := newTestRegistry(t)
 	ctx := context.Background()

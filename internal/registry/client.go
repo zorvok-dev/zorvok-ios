@@ -120,6 +120,55 @@ func (c *Client) Search(ctx context.Context, query string) ([]PackageInfo, error
 	return resp, nil
 }
 
+// Account is the authenticated identity behind a session token.
+type Account struct {
+	Email     string `json:"email"`
+	Name      string `json:"name"`
+	Verified  bool   `json:"verified"`
+	CreatedAt string `json:"created_at"`
+}
+
+// Me returns the account authenticated by sessionToken — used by
+// `zorvok trunk me`.
+func (c *Client) Me(ctx context.Context, sessionToken string) (*Account, error) {
+	var resp Account
+	if err := c.do(ctx, "GET", "/v1/auth/me", sessionToken, nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// AddOwner grants account publish rights on name — used by `zorvok
+// trunk add-owner`. The caller must already be an owner.
+func (c *Client) AddOwner(ctx context.Context, sessionToken, name, account string) error {
+	req := struct {
+		Email string `json:"email"`
+	}{account}
+	path := fmt.Sprintf("/v1/packages/%s/owners", name)
+	return c.do(ctx, "POST", path, sessionToken, req, nil)
+}
+
+// RemoveOwner revokes account's publish rights on name — used by
+// `zorvok trunk remove-owner`. The registry refuses to remove a
+// package's last remaining owner.
+func (c *Client) RemoveOwner(ctx context.Context, sessionToken, name, account string) error {
+	req := struct {
+		Email string `json:"email"`
+	}{account}
+	path := fmt.Sprintf("/v1/packages/%s/owners/remove", name)
+	return c.do(ctx, "POST", path, sessionToken, req, nil)
+}
+
+// Deprecate marks name as deprecated, optionally with a message (e.g.
+// "use OtherPod instead") — used by `zorvok trunk deprecate`.
+func (c *Client) Deprecate(ctx context.Context, sessionToken, name, message string) error {
+	req := struct {
+		Message string `json:"message"`
+	}{message}
+	path := fmt.Sprintf("/v1/packages/%s/deprecate", name)
+	return c.do(ctx, "POST", path, sessionToken, req, nil)
+}
+
 func (c *Client) do(ctx context.Context, method, path, sessionToken string, body, out any) error {
 	var reader io.Reader
 	if body != nil {
