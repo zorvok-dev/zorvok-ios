@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/zorvok-dev/zorvok/internal/auth"
-	"github.com/zorvok-dev/zorvok/internal/config"
+	"github.com/zorvok-dev/zorvok-ios/internal/auth"
+	"github.com/zorvok-dev/zorvok-ios/internal/config"
 )
 
 type checkStatus int

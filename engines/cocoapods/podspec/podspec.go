@@ -8,7 +8,7 @@ package podspec
 import (
 	"io"
 
-	"github.com/zorvok-dev/zorvok/engines/cocoapods/adapter"
+	"github.com/zorvok-dev/zorvok-ios/engines/cocoapods/adapter"
 )
 
 // Lint runs `pod lib lint` in dir, forwarding extraArgs verbatim

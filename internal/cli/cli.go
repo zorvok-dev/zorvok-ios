@@ -108,7 +108,7 @@ func Execute(args []string, out, errOut io.Writer) int {
 
 func reportPlanned(errOut io.Writer, name, milestone string) int {
 	fmt.Fprintf(errOut, "zorvok %s: not implemented yet (planned for %s)\n", name, milestone)
-	fmt.Fprintf(errOut, "see ROADMAP.md for status: https://github.com/zorvok-dev/zorvok/blob/main/ROADMAP.md\n")
+	fmt.Fprintf(errOut, "see ROADMAP.md for status: https://github.com/zorvok-dev/zorvok-ios/blob/main/ROADMAP.md\n")
 	return 1
 }
 

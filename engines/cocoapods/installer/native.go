@@ -4,7 +4,7 @@ import (
 	_ "embed"
 	"io"
 
-	"github.com/zorvok-dev/zorvok/engines/cocoapods/adapter"
+	"github.com/zorvok-dev/zorvok-ios/engines/cocoapods/adapter"
 )
 
 //go:embed zorvok_install.rb

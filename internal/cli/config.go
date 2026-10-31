@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/zorvok-dev/zorvok/internal/config"
+	"github.com/zorvok-dev/zorvok-ios/internal/config"
 )
 
 // runConfig implements `zorvok config [get <key> | set <key> <value> | unset <key> | list]`.

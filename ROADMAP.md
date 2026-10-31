@@ -11,7 +11,7 @@ Status key: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ **Architecture approved**
 
 ## Milestone 1 — CLI skeleton ✅
-`zorvok --version`, `--help`, `doctor`, `config`, `init`. No CocoaPods interaction yet — `install`/`update`/`search`/`info`/`lib lint`/`login`/`trunk push`/`registry *` all exist as named, documented, explicitly "not implemented yet" commands rather than failing as unknown or silently no-op'ing. Built in Go (module `github.com/zorvok-dev/zorvok` — chosen as a placeholder at the time, later confirmed to match a real `zorvok-dev` GitHub org; see "Publishing this repository" below), stdlib-only, unit tested.
+`zorvok --version`, `--help`, `doctor`, `config`, `init`. No CocoaPods interaction yet — `install`/`update`/`search`/`info`/`lib lint`/`login`/`trunk push`/`registry *` all exist as named, documented, explicitly "not implemented yet" commands rather than failing as unknown or silently no-op'ing. Built in Go (module `github.com/zorvok-dev/zorvok-ios` — chosen as a placeholder at the time, later confirmed to match a real `zorvok-dev` GitHub org; see "Publishing this repository" below), stdlib-only, unit tested.
 
 ## Milestone 2 — CocoaPods compatibility 🚧
 `zorvok install`, `zorvok update`, `zorvok lib lint` are implemented, delegating to real `pod install`/`pod update`/`pod lib lint` (ADR 0002, Phase 1) via `engines/cocoapods/{adapter,installer,podspec}`. A compatibility test (`engines/cocoapods/compatibility`) runs a real, unmodified `pod install` end-to-end — against actual CocoaPods, not a mock — confirming the Podfile is never touched, `Podfile.lock` gets the expected sections, and `Pods/`/`.xcworkspace` are produced.
@@ -103,19 +103,19 @@ CLI + Homebrew tap + website + documentation + public registry, all versioned an
 **[ADR 0009](docs/adr/0009-three-tier-registry-model.md)**: the registry became three tiers instead of one server — CocoaPods' own, Zorvok's free static public registry, and a self-hostable server for private/enterprise use (Maven-style: public registry + self-hosted Nexus/Artifactory-equivalent). Concretely:
 
 - **This repo** kept the CLI only — `registry-server/` and `cmd/zorvok-registry/` were removed.
-- **`zorvok-dev/zorvok-registry`** (new, separate repo, own `go.mod`): everything that was `registry-server/` + `cmd/zorvok-registry/`, unchanged architecture, builds and tests green standalone.
-- **`zorvok-dev/specs`** (new, separate repo): a static public registry — the exact same CDN protocol `zorvok-registry/cdn` serves live, as pre-committed files instead. Ownership/immutability, normally a database's job, are enforced by a GitHub Actions PR check (`scripts/validate-pr.sh`) instead — tested locally against real git repos and real attack scenarios (ownership hijack attempt, immutability violation, name/version mismatch, invalid JSON) before being wired into the workflow YAML, though the YAML itself hasn't run against real GitHub Actions yet (no Actions access available).
+- **`zorvok-dev/zorvok-registry-ios`** (new, separate repo, own `go.mod`): everything that was `registry-server/` + `cmd/zorvok-registry/`, unchanged architecture, builds and tests green standalone.
+- **`zorvok-dev/zorvok-specs`** (new, separate repo): a static public registry — the exact same CDN protocol `zorvok-registry/cdn` serves live, as pre-committed files instead. Ownership/immutability, normally a database's job, are enforced by a GitHub Actions PR check (`scripts/validate-pr.sh`) instead — tested locally against real git repos and real attack scenarios (ownership hijack attempt, immutability violation, name/version mismatch, invalid JSON) before being wired into the workflow YAML, though the YAML itself hasn't run against real GitHub Actions yet (no Actions access available).
 - This repo's own integration tests (`internal/registry`, `internal/publisher`) switched from importing `registry-server`'s Go packages directly (no longer possible — separate repo) to running a real `zorvok-registry` binary as a subprocess (`internal/registrytest`), the same pattern already used for testing against real `pod`/`git`.
 
 **Verified, not just built**: ran a plain local static HTTP file server over the `specs` skeleton (standing in for GitHub Pages) and confirmed `zorvok install --native --source http://localhost:.../` correctly detected it as a real CocoaPods CDN source and installed a published pod from it — zero server-side code running. Along the way, an unplanned confirmation of ADR 0007's dependency-confusion guard: a test pod name happened to collide with a real, already-registered CocoaPods pod, and `zorvok install` correctly refused to resolve it rather than silently picking a source.
 
 **Not done**:
 - Nothing has been pushed to GitHub — this session has no `gh` CLI and no push credentials configured. All three repos exist locally, fully built and tested, ready to push.
-- `zorvok trunk push` doesn't yet know how to publish to `zorvok-dev/specs` (PR-based publishing only, for now) — only to a live `zorvok-registry` server (Milestone 4).
-- The `zorvok-dev/specs` GitHub Actions workflow YAML is unverified against real GitHub Actions — only the shell scripts it calls are tested.
+- `zorvok trunk push` doesn't yet know how to publish to `zorvok-dev/zorvok-specs` (PR-based publishing only, for now) — only to a live `zorvok-registry` server (Milestone 4).
+- The `zorvok-dev/zorvok-specs` GitHub Actions workflow YAML is unverified against real GitHub Actions — only the shell scripts it calls are tested.
 
 ## Publishing this repository
-The Go module path chosen in Milestone 0 (`github.com/zorvok-dev/zorvok`) was a placeholder at the time — it turned out to match a real GitHub organization (`zorvok-dev`). Three repos now exist locally (`zorvok`, `zorvok-registry`, `specs` — Milestone 9 above) and are ready to push, but haven't been: this session has neither `gh` installed nor push credentials configured. Either authenticate `gh` in this environment, or push manually.
+The Go module path chosen in Milestone 0 (`github.com/zorvok-dev/zorvok-ios`) was a placeholder at the time — it turned out to match a real GitHub organization (`zorvok-dev`). Three repos now exist locally (`zorvok`, `zorvok-registry`, `specs` — Milestone 9 above) and are ready to push, but haven't been: this session has neither `gh` installed nor push credentials configured. Either authenticate `gh` in this environment, or push manually.
 
 ---
 

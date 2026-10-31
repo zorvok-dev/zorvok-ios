@@ -3,7 +3,7 @@ package cli
 import (
 	"os"
 
-	"github.com/zorvok-dev/zorvok/internal/config"
+	"github.com/zorvok-dev/zorvok-ios/internal/config"
 )
 
 // defaultRegistryURL is used when no `registry_url` is configured.

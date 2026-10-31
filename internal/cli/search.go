@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/zorvok-dev/zorvok/internal/registry"
+	"github.com/zorvok-dev/zorvok-ios/internal/registry"
 )
 
 // runSearch implements `zorvok search [query]` — a case-insensitive

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zorvok-dev/zorvok/internal/registry"
-	"github.com/zorvok-dev/zorvok/internal/registrytest"
+	"github.com/zorvok-dev/zorvok-ios/internal/registry"
+	"github.com/zorvok-dev/zorvok-ios/internal/registrytest"
 )
 
 const fixturesDir = "../../tests/fixtures"

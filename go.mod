@@ -1,4 +1,4 @@
-module github.com/zorvok-dev/zorvok
+module github.com/zorvok-dev/zorvok-ios
 
 go 1.27.3
 

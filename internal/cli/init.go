@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/zorvok-dev/zorvok/internal/config"
+	"github.com/zorvok-dev/zorvok-ios/internal/config"
 )
 
 // runInit creates a project-local .zorvok.yml. It never touches Podfile,

@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/zorvok-dev/zorvok/engines/cocoapods/adapter"
+	"github.com/zorvok-dev/zorvok-ios/engines/cocoapods/adapter"
 )
 
 // ErrNoPodfile is returned when dir has no Podfile. Zorvok manages

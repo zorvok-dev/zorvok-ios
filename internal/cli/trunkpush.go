@@ -5,9 +5,9 @@ import (
 	"io"
 	"os"
 
-	zauth "github.com/zorvok-dev/zorvok/internal/auth"
-	"github.com/zorvok-dev/zorvok/internal/publisher"
-	"github.com/zorvok-dev/zorvok/internal/registry"
+	zauth "github.com/zorvok-dev/zorvok-ios/internal/auth"
+	"github.com/zorvok-dev/zorvok-ios/internal/publisher"
+	"github.com/zorvok-dev/zorvok-ios/internal/registry"
 )
 
 // runTrunkPush implements `zorvok trunk push [PODSPEC] [--allow-warnings]

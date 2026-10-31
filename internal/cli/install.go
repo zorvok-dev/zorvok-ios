@@ -6,8 +6,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/zorvok-dev/zorvok/engines/cocoapods/adapter"
-	"github.com/zorvok-dev/zorvok/engines/cocoapods/installer"
+	"github.com/zorvok-dev/zorvok-ios/engines/cocoapods/adapter"
+	"github.com/zorvok-dev/zorvok-ios/engines/cocoapods/installer"
 )
 
 // runInstall implements

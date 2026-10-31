@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	zauth "github.com/zorvok-dev/zorvok/internal/auth"
-	"github.com/zorvok-dev/zorvok/internal/registry"
+	zauth "github.com/zorvok-dev/zorvok-ios/internal/auth"
+	"github.com/zorvok-dev/zorvok-ios/internal/registry"
 )
 
 // runLogin implements `zorvok login <email> [name]`, mirroring CocoaPods
