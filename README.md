@@ -80,7 +80,7 @@ cd ../zorvok-registry && go build -o /usr/local/bin/zorvok-registry ./cmd/zorvok
 
 ## Not yet implemented
 
-`brew install zorvok` (Homebrew distribution is Milestone 7), `zorvok registry list`/`registry add`, and `zorvok trunk push` targeting the static zorvok-dev/zorvok-specs registry (PR-based publishing works today; see that repo's own README).
+`brew install zorvok` — the formula exists and is verified ([zorvok-dev/homebrew-tap](https://github.com/zorvok-dev/homebrew-tap)), but can't actually work until `zorvok-ios` is pushed and tagged (see that tap repo's README) — along with `zorvok registry list`/`registry add` and `zorvok trunk push` targeting the static zorvok-dev/zorvok-specs registry (PR-based publishing works today; see that repo's own README).
 
 ## Scope
 

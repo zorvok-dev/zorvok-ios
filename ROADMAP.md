@@ -96,8 +96,10 @@ Verified with a full real-stack proof, not just Go tests: started a real `cmd/zo
 - `pod repo update` against a Zorvok CDN source and deprecated-pod signaling (`deprecated_podspecs.txt`) aren't implemented.
 - `pod lib lint`/`pod ipc spec` (used by `zorvok lib lint`/`trunk push`) still delegate to the `pod` CLI binary, unchanged — only `install` has a native path so far.
 
-## Milestone 7 — Public launch
+## Milestone 7 — Public launch 🚧
 CLI + Homebrew tap + website + documentation + public registry, all versioned and backward-compatible per the engineering rules below.
+
+**Homebrew tap: built and verified, not yet publishable.** `zorvok-dev/homebrew-tap` (local repo, not yet pushed) has a real formula (`Formula/zorvok.rb`) — tested by actually running `brew install`/`brew test`/`brew audit --strict`/`brew style` against it (pointed temporarily at a locally-built release tarball, since nothing's on GitHub yet), all passing. Can't go further until `zorvok-ios` is pushed and a real `v0.1.0` tag exists for the formula's `url`/`sha256` to resolve against — see that repo's own README for the exact commit to tag.
 
 ## Milestone 9 — Three-tier registry split ✅ (local), not yet pushed
 **[ADR 0009](docs/adr/0009-three-tier-registry-model.md)**: the registry became three tiers instead of one server — CocoaPods' own, Zorvok's free static public registry, and a self-hostable server for private/enterprise use (Maven-style: public registry + self-hosted Nexus/Artifactory-equivalent). Concretely:
