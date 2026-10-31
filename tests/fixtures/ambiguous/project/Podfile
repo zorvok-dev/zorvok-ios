@@ -1,0 +1,9 @@
+platform :ios, '13.0'
+
+target 'AmbiguousApp' do
+  use_frameworks!
+  # No :source pin — resolvable from BOTH injected federated sources
+  # (specs-a-template and specs-b-template both have SharedPod 1.0.0).
+  # Must be refused, not silently resolved by source declaration order.
+  pod 'SharedPod', '1.0.0'
+end

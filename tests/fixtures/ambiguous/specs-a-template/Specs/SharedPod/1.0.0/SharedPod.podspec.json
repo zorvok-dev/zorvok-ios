@@ -1,0 +1,11 @@
+{
+  "name": "SharedPod",
+  "version": "1.0.0",
+  "summary": "Fixture: pod A variant, used to test the Milestone 6 ambiguity preflight check.",
+  "homepage": "https://github.com/zorvok-dev/zorvok",
+  "license": "MIT",
+  "authors": {"Zorvok A": "dev-a@example.com"},
+  "source": {"git": "ZORVOK_AMBIGUOUS_POD_A_GIT_URL", "tag": "1.0.0"},
+  "platforms": {"ios": "13.0"},
+  "source_files": "Classes/**/*.{h,m}"
+}

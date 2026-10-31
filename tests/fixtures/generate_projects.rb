@@ -24,6 +24,9 @@ PROJECTS = [
   ["git-dependency/project", "GitApp", ["GitApp"]],
   ["xcframework/project", "XCFrameworkApp", ["XCFrameworkApp"]],
   ["federated-project", "FederatedApp", ["FederatedApp"]],
+  ["mixed-federation-project", "MixedApp", ["MixedApp"]],
+  ["ambiguous/project", "AmbiguousApp", ["AmbiguousApp"]],
+  ["ambiguous/project-pinned", "AmbiguousApp", ["AmbiguousApp"]],
 ]
 
 PROJECTS.each do |dir, name, targets|

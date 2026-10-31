@@ -1,0 +1,8 @@
+platform :ios, '13.0'
+
+target 'AmbiguousApp' do
+  use_frameworks!
+  # Explicitly pinned to source A — must bypass the ambiguity check and
+  # install successfully from exactly that source.
+  pod 'SharedPod', '1.0.0', :source => 'ZORVOK_SPECS_A_URL'
+end

@@ -1,0 +1,11 @@
+platform :ios, '13.0'
+
+target 'MixedApp' do
+  use_frameworks!
+  # Deliberately no `source` line of its own: DefaultSourcePod must
+  # still resolve from the implicit default (ZORVOK_DEFAULT_SOURCE_URL
+  # in tests; the real CDN in production) even though FederatedPod's
+  # source is explicitly injected via --native --source.
+  pod 'DefaultSourcePod', '1.0.0'
+  pod 'FederatedPod', '1.0.0'
+end
