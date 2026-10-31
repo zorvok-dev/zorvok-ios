@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/zorvok-dev/zorvok/registry-server/auth"
+	"github.com/zorvok-dev/zorvok/registry-server/cdn"
 	"github.com/zorvok-dev/zorvok/registry-server/packages"
 )
 
@@ -59,6 +60,12 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /v1/packages/{name}/versions", s.handlePublishVersion)
 	mux.HandleFunc("POST /v1/packages/{name}/owners", s.handleAddOwner)
 	mux.HandleFunc("POST /v1/packages/{name}/deprecate", s.handleDeprecate)
+
+	// The CocoaPods CDN protocol (registry-server/cdn), so this registry
+	// can be used directly as a Podfile `source` URL — see ADR 0005 and
+	// ADR 0006. Mounted at /cdn/; a Podfile would reference
+	// "<this server's base URL>/cdn/".
+	mux.Handle("/cdn/", http.StripPrefix("/cdn", cdn.Handler(s.Packages)))
 
 	return withLogging(s.limiter.middleware(mux))
 }
