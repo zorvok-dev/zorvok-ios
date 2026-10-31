@@ -61,11 +61,18 @@ What's covered, with real tests, not just described:
 
 **Not yet done**: no real email transport (same gap as Milestone 3 — `zorvok login` prints the same guidance about checking the dev server's log), and `zorvok trunk push` talks to exactly one registry (no federation — that's Milestone 5).
 
-## Milestone 5 — Registry federation
-`zorvok install` resolves from both Zorvok and CocoaPods registries using the precedence rules in ADR 0003. Dependency-confusion adversarial review required before this ships.
+## Milestone 5 — Registry federation (re-scoped) ⚠️
+**Re-scoped mid-milestone by [ADR 0004](docs/adr/0004-federation-requires-podfile-source-line.md).** The original plan — `zorvok install` automatically resolving from both registries using the precedence rules in ADR 0003, with zero Podfile awareness of Zorvok — turned out not to be achievable while still delegating to `pod install` (ADR 0002, Phase 1-2). This was discovered by testing the actual mechanism before building on it, not assumed: `pod install` has no flag to inject an extra source, and a spec repo registered globally via `pod repo add` is not implicitly searched — confirmed with CocoaPods' own error message, *"not added the source repo that hosts the Podspec to your Podfile."* A source must be declared in the Podfile itself; there is no invisible way to add one for a single run.
+
+**What Milestone 5 delivers instead**: using the Zorvok registry is opt-in, via the same one-line `source 'https://...'` a developer would add for any CocoaPods private registry — not a Zorvok-specific migration step. Remaining scope:
+- ⬜ Document the opt-in `source` line workflow (install guide / website docs, Milestone 6).
+- ⬜ `zorvok registry add <url>` / `zorvok registry list` — thin, documented wrappers around `pod repo add`/`pod repo list` with Zorvok-specific guidance (still listed as not-yet-implemented in `zorvok help`).
+- ⬜ `zorvok doctor` check for whether the configured Zorvok registry is present as a Podfile `source` line, to catch the easy "forgot to add the source" mistake with a clear message.
+
+**True automatic, zero-Podfile-touch federation — the original Milestone 5 goal — moves to Milestone 6**, where it's actually achievable: once Zorvok's own resolver controls the source list programmatically, the precedence rules in ADR 0003/ARCHITECTURE.md §2.3 apply for real, and the dependency-confusion adversarial review happens before *that* ships.
 
 ## Milestone 6 — Independent installation engine
-Phase 3 of ADR 0002: resolution moves from delegated `pod install` to a narrower Ruby shim calling `cocoapods-core` + `molinillo` + `xcodeproj` directly, under Zorvok's federation authority. Ships behind a flag with differential testing against the delegated path before becoming default. Xcode project generation remains on `xcodeproj` — not reimplemented, ever (ADR 0002).
+Phase 3 of ADR 0002: resolution moves from delegated `pod install` to a narrower Ruby shim calling `cocoapods-core` + `molinillo` + `xcodeproj` directly. This is also where real registry federation (originally Milestone 5's goal) becomes achievable, since Zorvok's resolver can inject sources programmatically without needing a Podfile `source` line (ADR 0004) — the precedence rules in ADR 0003 apply here, gated by the dependency-confusion adversarial review ARCHITECTURE.md §5 calls for. Ships behind a flag with differential testing against the delegated path before becoming default. Xcode project generation remains on `xcodeproj` — not reimplemented, ever (ADR 0002).
 
 ## Milestone 7 — Public launch
 CLI + Homebrew tap + website + documentation + public registry, all versioned and backward-compatible per the engineering rules below.
