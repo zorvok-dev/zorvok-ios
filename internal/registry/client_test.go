@@ -3,46 +3,22 @@ package registry
 import (
 	"context"
 	"errors"
-	"net/http/httptest"
-	"sync"
 	"testing"
 
-	regapi "github.com/zorvok-dev/zorvok/registry-server/api"
-	regauth "github.com/zorvok-dev/zorvok/registry-server/auth"
-	"github.com/zorvok-dev/zorvok/registry-server/packages"
+	"github.com/zorvok-dev/zorvok/internal/registrytest"
 )
 
-// capturingSender records verification links instead of sending real
-// email, so tests can drive register -> verify without a mail
-// transport — mirroring registry-server/api's own test helper, since
-// these tests exercise the real server, not a mock of it.
-type capturingSender struct {
-	mu   sync.Mutex
-	sent map[string]string
-}
-
-func newCapturingSender() *capturingSender { return &capturingSender{sent: map[string]string{}} }
-
-func (c *capturingSender) Send(_ context.Context, to, verifyURL string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.sent[to] = verifyURL
-	return nil
-}
-
-// newTestRegistry starts a real registry-server/api server (in-memory
-// store) and returns a Client pointed at it, so these tests exercise
-// the actual HTTP contract end-to-end rather than a mock of it.
-func newTestRegistry(t *testing.T) (*Client, *capturingSender) {
+// newTestRegistry starts a real zorvok-registry subprocess (zorvok-dev/
+// zorvok-registry, zorvok ADR 0009) and returns a Client pointed at it —
+// these tests exercise the actual HTTP contract against the real
+// server binary, not a mock of it.
+func newTestRegistry(t *testing.T) (*Client, *registrytest.Server) {
 	t.Helper()
-	sender := newCapturingSender()
-	server := regapi.NewServer(packages.NewMemoryStore(), regauth.NewMemoryStore(), sender, "http://testserver")
-	ts := httptest.NewServer(server.Routes())
-	t.Cleanup(ts.Close)
-	return NewClient(ts.URL), sender
+	srv := registrytest.Start(t)
+	return NewClient(srv.BaseURL), srv
 }
 
-func registerAndVerify(t *testing.T, client *Client, sender *capturingSender, email string) string {
+func registerAndVerify(t *testing.T, client *Client, srv *registrytest.Server, email string) string {
 	t.Helper()
 	ctx := context.Background()
 
@@ -51,14 +27,8 @@ func registerAndVerify(t *testing.T, client *Client, sender *capturingSender, em
 		t.Fatalf("Register: %v", err)
 	}
 
-	sender.mu.Lock()
-	verifyURL := sender.sent[email]
-	sender.mu.Unlock()
-	if verifyURL == "" {
-		t.Fatal("no verification email captured")
-	}
-	// The link is served by the same registry, just hit it directly.
-	resp, err := client.HTTP.Get(client.BaseURL + verifyURL[len("http://testserver"):])
+	verifyURL := srv.WaitForVerifyLink(t, email)
+	resp, err := client.HTTP.Get(verifyURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,9 +38,9 @@ func registerAndVerify(t *testing.T, client *Client, sender *capturingSender, em
 }
 
 func TestRegisterAndPublish(t *testing.T) {
-	client, sender := newTestRegistry(t)
+	client, srv := newTestRegistry(t)
 	ctx := context.Background()
-	token := registerAndVerify(t, client, sender, "dev@example.com")
+	token := registerAndVerify(t, client, srv, "dev@example.com")
 
 	podspec := `{"name":"Alamofire","version":"1.0.0"}`
 	published, err := client.PublishVersion(ctx, token, "Alamofire", "1.0.0", podspec, "https://github.com/example/Alamofire.git")
@@ -91,9 +61,9 @@ func TestRegisterAndPublish(t *testing.T) {
 }
 
 func TestPublishDuplicateVersionIsAPIError(t *testing.T) {
-	client, sender := newTestRegistry(t)
+	client, srv := newTestRegistry(t)
 	ctx := context.Background()
-	token := registerAndVerify(t, client, sender, "dev@example.com")
+	token := registerAndVerify(t, client, srv, "dev@example.com")
 
 	podspec := `{"name":"Alamofire","version":"1.0.0"}`
 	if _, err := client.PublishVersion(ctx, token, "Alamofire", "1.0.0", podspec, ""); err != nil {
@@ -133,9 +103,9 @@ func TestGetPackageNotFound(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	client, sender := newTestRegistry(t)
+	client, srv := newTestRegistry(t)
 	ctx := context.Background()
-	token := registerAndVerify(t, client, sender, "dev@example.com")
+	token := registerAndVerify(t, client, srv, "dev@example.com")
 
 	for _, name := range []string{"Alamofire", "SDWebImage"} {
 		if _, err := client.PublishVersion(ctx, token, name, "1.0.0", `{"name":"`+name+`","version":"1.0.0"}`, ""); err != nil {

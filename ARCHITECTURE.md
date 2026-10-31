@@ -152,6 +152,8 @@ This remains intentionally conservative: not trying to out-resolve Molinillo, ju
 
 ### 2.4 Zorvok Registry server
 
+**This section describes Tier 3 — `zorvok-registry`, the self-hostable server — now its own repository.** See [ADR 0009](docs/adr/0009-three-tier-registry-model.md) for the three-tier model and why: this design remains correct and unchanged for anyone running their own registry; it was never meant to be how *Zorvok's own* public registry gets hosted (that's Tier 2, `zorvok-dev/specs` — static files, no server, see ADR 0009's "genuinely new" section on how ownership/immutability work without a database there).
+
 Standard, boring, proven stack — intentionally no novelty here, all the novelty budget goes to compatibility and federation:
 
 - **Metadata store:** PostgreSQL. Packages, versions, owners, download stats, deprecation flags, audit log. Relational because ownership/permissions/version-immutability are exactly the kind of invariants a relational DB with real constraints protects well (e.g., a DB-level uniqueness constraint on `(package_name, version)` is a stronger immutability guarantee than app-level checks alone).
@@ -162,38 +164,47 @@ Standard, boring, proven stack — intentionally no novelty here, all the novelt
 
 ## 3. Repository structure
 
-The brief's suggested layout is sound; adopted with the Go module conventions applied (`cmd/`, `internal/`):
+**Superseded by [ADR 0009](docs/adr/0009-three-tier-registry-model.md).** The single-monorepo layout originally planned here (including `registry-server/` and `website/`) was the Milestone 0 plan; it held through Milestone 8, then split into three repositories once the registry itself split into tiers. The structure below is what actually exists, not the original plan:
 
+**`zorvok-dev/zorvok`** (this repo — the CLI):
 ```
 zorvok/
 ├── cmd/zorvok/                   # main package, flag parsing entry point only
 ├── internal/
-│   ├── cli/                      # command routing (install, update, search, ...)
+│   ├── cli/                      # command routing (install, update, search, login, ...)
 │   ├── config/                   # ~/.zorvok config, per-project .zorvok.yml
-│   ├── auth/                     # Zorvok session/token management
-│   ├── registry/                 # HTTP clients: Zorvok API + CocoaPods CDN reader
-│   ├── installer/                # orchestrates engines/cocoapods + registry + resolver
-│   ├── resolver/                 # federation/provenance logic (§2.3) — registry-agnostic
+│   ├── auth/                     # local credential storage (per-registry-host session tokens)
+│   ├── registry/                 # Go HTTP client for the registry REST API
+│   ├── registrytest/             # starts a real zorvok-registry subprocess for tests (ADR 0009)
+│   ├── installer/                # orchestrates engines/cocoapods
 │   └── publisher/                # lib lint + trunk push orchestration
 ├── engines/cocoapods/
 │   ├── adapter/                  # subprocess/IPC boundary — the only Ruby-calling code
-│   ├── podfile/                  # Podfile → Go struct (via `pod ipc podfile-json`)
-│   ├── podspec/                  # podspec → Go struct (via `pod ipc spec`)
-│   ├── installer/                # Phase 1-2: shells to `pod install`; Phase 3+: Ruby shim
-│   └── compatibility/            # golden-file / fixture-diff tests against real CocoaPods
-├── registry-server/
-│   ├── api/ auth/ packages/ versions/ storage/
-├── website/                      # landing, docs, package search/detail pages
-├── docs/
-│   └── adr/                      # architecture decision records (this doc's decisions, one per file)
-├── tests/
-│   ├── fixtures/                 # real-world Podfiles/podspecs for compatibility testing
-│   ├── compatibility/            # CocoaPods compatibility test suite
-│   └── integration/
-└── homebrew/                     # tap formula
+│   ├── podspec/                  # podspec → JSON (via `pod ipc spec`)
+│   ├── installer/                # Phase 1-2: shells to `pod install`; Phase 3: Ruby shim (ADR 0005)
+│   └── compatibility/            # fixture-diff tests against real CocoaPods
+├── docs/adr/                      # architecture decision records, including this repo split
+├── tests/fixtures/                # real-world Podfiles/podspecs for compatibility + federation testing
+├── ARCHITECTURE.md, ROADMAP.md
 ```
 
-No code exists yet in any of these — directories are created empty/stubbed pending Milestone 1 approval, per the "do not generate huge amounts of code before validating architecture" rule.
+**[`zorvok-dev/zorvok-registry`](https://github.com/zorvok-dev/zorvok-registry)** (Tier 3, self-hostable):
+```
+zorvok-registry/
+├── cmd/zorvok-registry/
+├── api/ auth/ cdn/ packages/ storage/
+```
+
+**[`zorvok-dev/specs`](https://github.com/zorvok-dev/specs)** (Tier 2, Zorvok's own free public registry):
+```
+specs/
+├── CocoaPods-version.yml, all_pods.txt, all_pods_versions.txt   # regenerated, not hand-edited
+├── Specs/<name>/OWNERS, <version>/<name>.podspec.json            # published content
+├── scripts/validate-pr.sh, generate-index.sh                     # the ownership/immutability enforcement a server's database would otherwise provide
+└── .github/workflows/                                            # wires the scripts above to PRs/merges
+```
+
+`website/` and `homebrew/` (Milestone 7, public launch) haven't been started.
 
 ## 4. CocoaPods compatibility assessment
 
