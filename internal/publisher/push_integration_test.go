@@ -4,18 +4,14 @@ import (
 	"context"
 	"io"
 	"io/fs"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/zorvok-dev/zorvok/internal/registry"
-	regapi "github.com/zorvok-dev/zorvok/registry-server/api"
-	regauth "github.com/zorvok-dev/zorvok/registry-server/auth"
-	"github.com/zorvok-dev/zorvok/registry-server/packages"
+	"github.com/zorvok-dev/zorvok/internal/registrytest"
 )
 
 const fixturesDir = "../../tests/fixtures"
@@ -27,35 +23,21 @@ func requirePod(t *testing.T) {
 	}
 }
 
-type capturingSender struct {
-	mu   sync.Mutex
-	sent map[string]string
-}
-
-func (c *capturingSender) Send(_ context.Context, to, verifyURL string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.sent[to] = verifyURL
-	return nil
-}
-
+// newTestRegistry starts a real zorvok-registry subprocess (zorvok-dev/
+// zorvok-registry, zorvok ADR 0009 — the server's Go packages moved to
+// their own repo, so this can no longer import them directly).
 func newTestRegistry(t *testing.T) (*registry.Client, string) {
 	t.Helper()
-	sender := &capturingSender{sent: map[string]string{}}
-	server := regapi.NewServer(packages.NewMemoryStore(), regauth.NewMemoryStore(), sender, "http://testserver")
-	ts := httptest.NewServer(server.Routes())
-	t.Cleanup(ts.Close)
+	srv := registrytest.Start(t)
+	client := registry.NewClient(srv.BaseURL)
 
-	client := registry.NewClient(ts.URL)
 	ctx := context.Background()
 	token, err := client.Register(ctx, "dev@example.com", "Dev")
 	if err != nil {
 		t.Fatal(err)
 	}
-	sender.mu.Lock()
-	verifyURL := sender.sent["dev@example.com"]
-	sender.mu.Unlock()
-	resp, err := client.HTTP.Get(client.BaseURL + verifyURL[len("http://testserver"):])
+	verifyURL := srv.WaitForVerifyLink(t, "dev@example.com")
+	resp, err := client.HTTP.Get(verifyURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,8 +81,8 @@ func copyTree(t *testing.T, src, dst string) {
 // TestPushPublishesToARealRunningRegistry is the Milestone 4 acceptance
 // test (ROADMAP.md: "Publish a real test podspec end-to-end"): lints a
 // real podspec with real `pod lib lint`, converts it with real `pod ipc
-// spec`, and publishes it to a real (in-memory, httptest) registry
-// server — the same server binary cmd/zorvok-registry runs, not a mock.
+// spec`, and publishes it to a real, running zorvok-registry subprocess
+// (in-memory store) — not a mock.
 func TestPushPublishesToARealRunningRegistry(t *testing.T) {
 	requirePod(t)
 
