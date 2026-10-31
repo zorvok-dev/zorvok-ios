@@ -1,0 +1,2 @@
+@interface PublishablePod : NSObject
+@end

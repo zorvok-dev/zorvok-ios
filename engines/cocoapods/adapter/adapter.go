@@ -5,6 +5,7 @@
 package adapter
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -53,6 +54,34 @@ func Run(out, errOut io.Writer, dir string, args ...string) error {
 		return fmt.Errorf("running pod %s: %w", args[0], err)
 	}
 	return nil
+}
+
+// Capture executes `pod <args...>` in dir like Run, but returns stdout as
+// a string instead of streaming it — for commands like `pod ipc spec`
+// whose output is data Zorvok needs to parse, not progress to show the
+// user. stderr still streams live to errOut, since `pod` may print
+// warnings there even on success.
+func Capture(errOut io.Writer, dir string, args ...string) (string, error) {
+	path, err := Find()
+	if err != nil {
+		return "", err
+	}
+
+	var stdout bytes.Buffer
+	cmd := exec.Command(path, args...)
+	cmd.Dir = dir
+	cmd.Stdout = &stdout
+	cmd.Stderr = errOut
+	cmd.Stdin = os.Stdin
+
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return "", fmt.Errorf("%w (exit %d)", ErrCommandFailed, exitErr.ExitCode())
+		}
+		return "", fmt.Errorf("running pod %s: %w", args[0], err)
+	}
+	return stdout.String(), nil
 }
 
 // Version returns `pod --version`'s output.

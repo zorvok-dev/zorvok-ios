@@ -19,3 +19,16 @@ func Lint(out, errOut io.Writer, dir string, extraArgs []string) error {
 	}
 	return adapter.Run(out, errOut, dir, append([]string{"lib", "lint"}, extraArgs...)...)
 }
+
+// JSON returns a podspec's CocoaPods-Core representation as JSON, via
+// `pod ipc spec` — the same IPC seam ARCHITECTURE.md §2.2 designates as
+// the only place a podspec's Ruby DSL gets evaluated. Used by
+// `zorvok trunk push` (internal/publisher) to get a declarative,
+// publishable form of the podspec without Zorvok ever parsing Ruby
+// itself.
+func JSON(errOut io.Writer, dir, podspecPath string) (string, error) {
+	if _, err := adapter.Find(); err != nil {
+		return "", err
+	}
+	return adapter.Capture(errOut, dir, "ipc", "spec", podspecPath)
+}

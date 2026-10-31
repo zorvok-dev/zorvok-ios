@@ -32,8 +32,6 @@ type plannedCommand struct {
 var plannedCommands = []plannedCommand{
 	{"search", "Search for a package by name", "Milestone 3"},
 	{"info", "Show details for a package", "Milestone 3"},
-	{"login", "Authenticate with the Zorvok registry", "Milestone 4"},
-	{"trunk push", "Publish a podspec to the Zorvok registry", "Milestone 4"},
 	{"registry list", "List configured package registries", "Milestone 5"},
 	{"registry add", "Add a package registry", "Milestone 5"},
 }
@@ -50,6 +48,8 @@ func commands() []command {
 		{"install", "Install dependencies from the Podfile (delegates to `pod install`)", runInstall, true},
 		{"update", "Update installed dependencies (delegates to `pod update`)", runUpdate, true},
 		{"lib lint", "Validate a podspec (delegates to `pod lib lint`)", runLibLint, true},
+		{"login", "Authenticate with the Zorvok registry", runLogin, true},
+		{"trunk push", "Publish a podspec to the Zorvok registry", runTrunkPush, true},
 	}
 }
 

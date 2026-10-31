@@ -50,8 +50,16 @@ What's covered, with real tests, not just described:
 - **Object storage / CDN for artifacts** — not needed yet; Milestone 3 is reference-only hosting (a podspec's `source` is a `:git`/`:http` URL, per ADR 0003's MVP scope).
 - **Ownership-precedence adversarial review** (ARCHITECTURE.md §5.4) — still required before Milestone 5 (federation) ships; Milestone 3's ownership model (first-publisher-wins) is necessary but not sufficient for that review.
 
-## Milestone 4 — Publishing
-`zorvok login`, `zorvok trunk push`. Publish a real test podspec end-to-end. `internal/publisher` + server-side validation (ADR 0003 constraints: immutability, ownership, duplicate-version rejection).
+## Milestone 4 — Publishing ✅
+`zorvok login <email>` and `zorvok trunk push [podspec] [--allow-warnings] [--skip-lint]` are implemented and wired to a real registry. Verified both ways: `go test ./internal/publisher/...` runs the full flow (real `pod lib lint` + real `pod ipc spec` + a real httptest registry server) including negative cases, and I also drove it manually against a real running `cmd/zorvok-registry` with the actual `zorvok` binary — register → verify → `trunk push` → published → re-push correctly rejected with 409.
+
+What's covered, with real tests, not just described:
+- **`internal/registry`**: a Go HTTP client for the registry API, tested against a real server (not a mock) — register, publish, get, and each error path (404/403/409) as a typed `*registry.APIError`.
+- **`internal/publisher`**: locates the single `*.podspec` in the current directory (explicit error if zero or more than one — never guesses), lints it with real `pod lib lint` before publishing anything, converts it to JSON with real `pod ipc spec`, and **rejects client-side** a podspec whose `source` is a local `:path` (useless to publish — nobody else could install it) before any network call. `TestPushFailsLintBeforePublishing` confirms a podspec that fails lint never reaches the registry at all.
+- **`zorvok login`**: stores the session token via `internal/auth`'s per-registry-host credential store (built in Milestone 1), keyed by the configured `registry_url`.
+- **Config**: `registry_url` (project-over-global, like every other `zorvok config` key) defaults to `http://localhost:8080` — the local dev server's own default — since there's no public Zorvok registry yet; never a hardcoded production URL.
+
+**Not yet done**: no real email transport (same gap as Milestone 3 — `zorvok login` prints the same guidance about checking the dev server's log), and `zorvok trunk push` talks to exactly one registry (no federation — that's Milestone 5).
 
 ## Milestone 5 — Registry federation
 `zorvok install` resolves from both Zorvok and CocoaPods registries using the precedence rules in ADR 0003. Dependency-confusion adversarial review required before this ships.
