@@ -11,7 +11,7 @@ Status key: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ **Architecture approved**
 
 ## Milestone 1 — CLI skeleton ✅
-`zorvok --version`, `--help`, `doctor`, `config`, `init`. No CocoaPods interaction yet — `install`/`update`/`search`/`info`/`lib lint`/`login`/`trunk push`/`registry *` all exist as named, documented, explicitly "not implemented yet" commands rather than failing as unknown or silently no-op'ing. Built in Go (module `github.com/zorvok-dev/zorvok`, placeholder path pending a real org), stdlib-only, unit tested.
+`zorvok --version`, `--help`, `doctor`, `config`, `init`. No CocoaPods interaction yet — `install`/`update`/`search`/`info`/`lib lint`/`login`/`trunk push`/`registry *` all exist as named, documented, explicitly "not implemented yet" commands rather than failing as unknown or silently no-op'ing. Built in Go (module `github.com/zorvok-dev/zorvok` — chosen as a placeholder at the time, later confirmed to match a real `zorvok-dev` GitHub org; see "Publishing this repository" below), stdlib-only, unit tested.
 
 ## Milestone 2 — CocoaPods compatibility 🚧
 `zorvok install`, `zorvok update`, `zorvok lib lint` are implemented, delegating to real `pod install`/`pod update`/`pod lib lint` (ADR 0002, Phase 1) via `engines/cocoapods/{adapter,installer,podspec}`. A compatibility test (`engines/cocoapods/compatibility`) runs a real, unmodified `pod install` end-to-end — against actual CocoaPods, not a mock — confirming the Podfile is never touched, `Podfile.lock` gets the expected sections, and `Pods/`/`.xcworkspace` are produced.
@@ -35,7 +35,7 @@ Status key: ✅ done · 🚧 in progress · ⬜ not started
 `engines/cocoapods/podfile`/`podspec` parsing (via `pod ipc`) for federation use is deferred to Milestone 5, since Phase 1 delegation doesn't need it yet.
 
 ## Milestone 3 — Public registry 🚧
-`registry-server` implements a versioned HTTP API (`registry-server/api`), package/version metadata with ownership and immutability (`registry-server/packages`), and Trunk-style email-verified session auth (`registry-server/auth`) — server-side only, no CLI wiring yet (that's Milestone 4). `cmd/zorvok-registry` runs it; verified end-to-end both via `go test ./registry-server/...` (httptest) and a real running server exercised with `curl` (register → verify → publish → get → duplicate-rejected).
+`registry-server` implements a versioned HTTP API (`registry-server/api`), package/version metadata with ownership and immutability (`registry-server/packages`), and Trunk-style email-verified session auth (`registry-server/auth`). `cmd/zorvok-registry` runs it; verified end-to-end both via `go test ./registry-server/...` (httptest) and a real running server exercised with `curl` (register → verify → publish → get → duplicate-rejected). CLI wiring landed later, across Milestones 4 (`login`/`trunk push`) and this increment (`search`/`info`, via `internal/registry.Client.Search`) — all four talk to the same registry API.
 
 What's covered, with real tests, not just described:
 - **Ownership / package-takeover protection** (brief §9): first publisher of a name owns it; a different account publishing to that name is rejected (403) — `TestPublishRejectsNonOwner`.
@@ -98,6 +98,9 @@ Verified with a full real-stack proof, not just Go tests: started a real `cmd/zo
 
 ## Milestone 7 — Public launch
 CLI + Homebrew tap + website + documentation + public registry, all versioned and backward-compatible per the engineering rules below.
+
+## Publishing this repository
+The Go module path chosen in Milestone 0 (`github.com/zorvok-dev/zorvok`) was a placeholder at the time — it turned out to match a real GitHub organization (`zorvok-dev`, created around the same time this project started, currently empty: 0 public repos). Nothing has been pushed there yet. Open questions before anything is: what repos to create (this one as `zorvok-dev/zorvok`? a separate `homebrew-tap` per §7 of the brief? anything else?), public vs. private for each, and whether/how to authenticate `gh`/git push access in whatever environment does the pushing — this session has neither `gh` installed nor push credentials configured.
 
 ---
 

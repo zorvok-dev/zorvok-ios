@@ -53,18 +53,11 @@ func TestUnknownCommand(t *testing.T) {
 	}
 }
 
-func TestPlannedCommandIsHonestNotSilent(t *testing.T) {
-	// `search` is a real, named product command with no implementation yet.
-	// It must say so loudly, never exit 0 as if it had done something.
-	_, errOut, code := run("search")
-	if code != 1 {
-		t.Fatalf("exit code = %d, want 1", code)
-	}
-	if !strings.Contains(errOut, "not implemented yet") {
-		t.Fatalf("expected an explicit not-implemented message, got %q", errOut)
-	}
-}
-
+// TestPlannedTwoWordCommandIsHonestNotSilent is the only remaining
+// planned-command case — every single-word planned command (search,
+// info, login, trunk push's single-word sibling install/update/lib
+// lint) now has a real implementation; only the two-word `registry
+// add`/`registry list` (Milestone 5) are still pending.
 func TestPlannedTwoWordCommandIsHonestNotSilent(t *testing.T) {
 	_, errOut, code := run("registry", "add")
 	if code != 1 {
