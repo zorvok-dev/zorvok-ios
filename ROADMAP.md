@@ -100,9 +100,11 @@ Verified with a full real-stack proof, not just Go tests: started a real `cmd/zo
 ## Milestone 7 — Public launch 🚧
 CLI + Homebrew tap + website + documentation + public registry, all versioned and backward-compatible per the engineering rules below.
 
-**Homebrew tap: built and verified, not yet publishable.** `zorvok-dev/homebrew-tap` (local repo, not yet pushed) has a real formula (`Formula/zorvok.rb`) — tested by actually running `brew install`/`brew test`/`brew audit --strict`/`brew style` against it (pointed temporarily at a locally-built release tarball, since nothing's on GitHub yet), all passing. Can't go further until `zorvok-ios` is pushed and a real `v0.1.0` tag exists for the formula's `url`/`sha256` to resolve against — see that repo's own README for the exact commit to tag.
+**Command parity with CocoaPods: ✅ done.** Every command `pod --help` lists has a Zorvok equivalent: the registry-native `trunk register`/`me`/`push`/`add-owner`/`remove-owner`/`deprecate`/`info` (`trunk delete` deliberately refuses and points at `deprecate` — published versions are immutable by design, ADR 0003), plus generic delegation (`internal/cli/delegate.go`) for every remaining pass-through command — `spec`, `cache`, `ipc`, `plugins`, `list`, `outdated`, `try`, `env`, `setup`, `deintegrate`, `lib create`, `registry lint`/`push`. See the README's command reference table for the full list. Verified both with stub-`pod` argv-forwarding tests and, for several, against real local state (`env`'s real stack info, `cache list`/`plugins installed`'s real local data, `ipc podfile-json` converting a real Podfile).
 
-## Milestone 9 — Three-tier registry split ✅ (local), not yet pushed
+**Homebrew tap: built and verified, not yet publishable.** `zorvok-dev/homebrew-tap` has a real formula (`Formula/zorvok.rb`) — tested by actually running `brew install`/`brew test`/`brew audit --strict`/`brew style` against it (pointed temporarily at a locally-built release tarball, since there was no GitHub release yet at the time), all passing. The tap repo itself has not been pushed to GitHub yet, and still can't go further until `zorvok-ios` has a real tagged release for the formula's `url`/`sha256` to resolve against — see that repo's own README for the exact commit to tag. (`zorvok-ios` itself, and `zorvok-specs`, are pushed and public — see "Publishing this repository" below; `go install github.com/zorvok-dev/zorvok-ios/cmd/zorvok@main` already works today, with no tag needed.)
+
+## Milestone 9 — Three-tier registry split ✅
 **[ADR 0009](docs/adr/0009-three-tier-registry-model.md)**: the registry became three tiers instead of one server — CocoaPods' own, Zorvok's free static public registry, and a self-hostable server for private/enterprise use (Maven-style: public registry + self-hosted Nexus/Artifactory-equivalent). Concretely:
 
 - **This repo** kept the CLI only — `registry-server/` and `cmd/zorvok-registry/` were removed.
@@ -113,12 +115,11 @@ CLI + Homebrew tap + website + documentation + public registry, all versioned an
 **Verified, not just built**: ran a plain local static HTTP file server over the `specs` skeleton (standing in for GitHub Pages) and confirmed `zorvok install --native --source http://localhost:.../` correctly detected it as a real CocoaPods CDN source and installed a published pod from it — zero server-side code running. Along the way, an unplanned confirmation of ADR 0007's dependency-confusion guard: a test pod name happened to collide with a real, already-registered CocoaPods pod, and `zorvok install` correctly refused to resolve it rather than silently picking a source.
 
 **Not done**:
-- Nothing has been pushed to GitHub — this session has no `gh` CLI and no push credentials configured. All three repos exist locally, fully built and tested, ready to push.
-- `zorvok trunk push` doesn't yet know how to publish to `zorvok-dev/zorvok-specs` (PR-based publishing only, for now) — only to a live `zorvok-registry` server (Milestone 4).
-- The `zorvok-dev/zorvok-specs` GitHub Actions workflow YAML is unverified against real GitHub Actions — only the shell scripts it calls are tested.
+- `zorvok trunk push` doesn't yet know how to publish to `zorvok-dev/zorvok-specs` (PR-based publishing only, for now) — only to a live `zorvok-registry-ios` server (Milestone 4).
+- The `zorvok-dev/zorvok-specs` GitHub Actions workflow YAML is unverified against real GitHub Actions — only the shell scripts it calls are tested. GitHub Pages is also not yet enabled for that repo (confirmed: its `github.io` URL 404s as of this writing) — `raw.githubusercontent.com` serves the same files today and is what the README documents in the meantime.
 
 ## Publishing this repository
-The Go module path chosen in Milestone 0 (`github.com/zorvok-dev/zorvok-ios`) was a placeholder at the time — it turned out to match a real GitHub organization (`zorvok-dev`). Three repos now exist locally (`zorvok`, `zorvok-registry`, `specs` — Milestone 9 above) and are ready to push, but haven't been: this session has neither `gh` installed nor push credentials configured. Either authenticate `gh` in this environment, or push manually.
+The Go module path chosen in Milestone 0 (`github.com/zorvok-dev/zorvok-ios`) was a placeholder at the time — it turned out to match a real GitHub organization (`zorvok-dev`). **Status: pushed.** `zorvok-ios` and `zorvok-specs` are pushed to GitHub and public; `zorvok-registry-ios` is pushed and kept **private** (it holds the registry's internal implementation, per the original split into "private internal logic" vs. "public specs"). `homebrew-tap` exists locally, built and verified, but has not been pushed yet — see Milestone 7 above.
 
 ---
 

@@ -1,6 +1,6 @@
 # Zorvok Architecture
 
-Status: **Milestone 0 — proposed, not yet implemented.** Nothing in this document is built. This is the architecture to be reviewed and approved before Milestone 1 begins.
+Status: **Approved and implemented.** This document captures the Milestone 0 architecture as proposed and approved; it is kept as the design record, not a live status page. For what is actually built today — including decisions that superseded or re-scoped parts of this plan as real implementation surfaced new constraints — see [ROADMAP.md](ROADMAP.md) (milestone-by-milestone status) and [docs/adr/](docs/adr/) (the individual decisions, including the ones that corrected this document's original assumptions, e.g. [ADR 0004](docs/adr/0004-federation-requires-podfile-source-line.md) and [ADR 0009](docs/adr/0009-three-tier-registry-model.md)).
 
 ## 1. Problem framing
 

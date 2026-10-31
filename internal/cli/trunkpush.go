@@ -5,9 +5,7 @@ import (
 	"io"
 	"os"
 
-	zauth "github.com/zorvok-dev/zorvok-ios/internal/auth"
 	"github.com/zorvok-dev/zorvok-ios/internal/publisher"
-	"github.com/zorvok-dev/zorvok-ios/internal/registry"
 )
 
 // runTrunkPush implements `zorvok trunk push [PODSPEC] [--allow-warnings]
@@ -37,22 +35,12 @@ func runTrunkPush(out, errOut io.Writer, args []string) int {
 		return exitErr(errOut, "determine working directory: %v", err)
 	}
 
-	url, err := registryURL()
-	if err != nil {
-		return exitErr(errOut, "%v", err)
-	}
-
-	store, err := zauth.LoadStore()
-	if err != nil {
-		return exitErr(errOut, "%v", err)
-	}
-	creds, ok := store.Get(url)
+	client, url, token, ok := loggedInClient(errOut)
 	if !ok {
-		return exitErr(errOut, "not logged in to %s — run `zorvok login <email>` first", url)
+		return 1
 	}
 
-	client := registry.NewClient(url)
-	published, err := publisher.Push(context.Background(), out, errOut, cwd, client, creds.Token, opts)
+	published, err := publisher.Push(context.Background(), out, errOut, cwd, client, token, opts)
 	if err != nil {
 		return exitErr(errOut, "%v", err)
 	}

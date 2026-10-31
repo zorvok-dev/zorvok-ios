@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	zauth "github.com/zorvok-dev/zorvok-ios/internal/auth"
 	"github.com/zorvok-dev/zorvok-ios/internal/registry"
@@ -115,9 +116,8 @@ func runTrunkDeprecate(out, errOut io.Writer, args []string) int {
 	name := args[0]
 	message := ""
 	for _, a := range args[1:] {
-		const prefix = "--in-favor-of="
-		if len(a) > len(prefix) && a[:len(prefix)] == prefix {
-			message = "use " + a[len(prefix):] + " instead"
+		if rest, ok := strings.CutPrefix(a, "--in-favor-of="); ok && rest != "" {
+			message = "use " + rest + " instead"
 		}
 	}
 
