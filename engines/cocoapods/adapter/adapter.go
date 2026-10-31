@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 // ErrNotFound is returned when the `pod` executable isn't on PATH.
@@ -82,6 +83,39 @@ func Capture(errOut io.Writer, dir string, args ...string) (string, error) {
 		return "", fmt.Errorf("running pod %s: %w", args[0], err)
 	}
 	return stdout.String(), nil
+}
+
+// RunRubyScript runs a Ruby script against the same CocoaPods gem
+// environment `pod` itself uses (see ResolveRubyEnv), feeding the
+// script over stdin (`ruby -`) rather than writing it to a temp file —
+// script is a compile-time-embedded string (installer/zorvok_install.rb),
+// not something that needs a path on disk. args become the script's
+// ARGV. Used only by Milestone 6's native installer path (ADR 0002
+// Phase 3); everything else in this package shells to `pod` itself.
+func RunRubyScript(out, errOut io.Writer, dir, script string, args ...string) error {
+	env, err := ResolveRubyEnv()
+	if err != nil {
+		return err
+	}
+
+	cmdArgs := append([]string{"-"}, args...)
+	cmd := exec.Command(env.RubyPath, cmdArgs...)
+	cmd.Dir = dir
+	cmd.Stdin = strings.NewReader(script)
+	cmd.Stdout = out
+	cmd.Stderr = errOut
+	if env.GemHome != "" {
+		cmd.Env = append(os.Environ(), "GEM_HOME="+env.GemHome)
+	}
+
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return fmt.Errorf("%w (exit %d)", ErrCommandFailed, exitErr.ExitCode())
+		}
+		return fmt.Errorf("running ruby script: %w", err)
+	}
+	return nil
 }
 
 // Version returns `pod --version`'s output.
