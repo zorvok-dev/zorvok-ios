@@ -1,0 +1,2 @@
+@interface UpdatablePod : NSObject
+@end

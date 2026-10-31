@@ -53,13 +53,18 @@ func TestUnknownCommand(t *testing.T) {
 	}
 }
 
-// TestPlannedTwoWordCommandIsHonestNotSilent is the only remaining
-// planned-command case — every single-word planned command (search,
-// info, login, trunk push's single-word sibling install/update/lib
-// lint) now has a real implementation; only the two-word `registry
-// add`/`registry list` (Milestone 5) are still pending.
+// TestPlannedTwoWordCommandIsHonestNotSilent exercises the planned-
+// command mechanism itself — every real command now has an
+// implementation (plannedCommands is currently empty), so this injects
+// a temporary fake entry rather than relying on one actual command
+// staying unimplemented forever. Whatever the next genuinely planned
+// command turns out to be, this is the mechanism it will use.
 func TestPlannedTwoWordCommandIsHonestNotSilent(t *testing.T) {
-	_, errOut, code := run("registry", "add")
+	original := plannedCommands
+	plannedCommands = append([]plannedCommand{}, plannedCommand{"someday feature", "A hypothetical future command", "Milestone 99"})
+	t.Cleanup(func() { plannedCommands = original })
+
+	_, errOut, code := run("someday", "feature")
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
 	}
