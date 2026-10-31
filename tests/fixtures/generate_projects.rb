@@ -23,6 +23,7 @@ PROJECTS = [
   ["multi-target/project", "MultiTargetApp", ["AppOne", "AppTwo"]],
   ["git-dependency/project", "GitApp", ["GitApp"]],
   ["xcframework/project", "XCFrameworkApp", ["XCFrameworkApp"]],
+  ["federated-project", "FederatedApp", ["FederatedApp"]],
 ]
 
 PROJECTS.each do |dir, name, targets|

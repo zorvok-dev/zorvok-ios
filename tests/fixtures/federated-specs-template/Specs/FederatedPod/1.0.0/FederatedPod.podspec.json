@@ -1,0 +1,11 @@
+{
+  "name": "FederatedPod",
+  "version": "1.0.0",
+  "summary": "Fixture: a pod only resolvable via a federated source.",
+  "homepage": "https://github.com/zorvok-dev/zorvok",
+  "license": "MIT",
+  "authors": {"Zorvok": "dev@example.com"},
+  "source": {"git": "ZORVOK_FEDERATED_POD_GIT_URL", "tag": "1.0.0"},
+  "platforms": {"ios": "13.0"},
+  "source_files": "Classes/**/*.{h,m}"
+}

@@ -134,18 +134,13 @@ The original plan: feed `pod install` a synthesized, provenance-tagged source li
 - A Specs repo registered globally via `pod repo add` is **not** implicitly searched — confirmed empirically: a Podfile with no `source` line, run against a pod only present in that added repo, fails with CocoaPods' own error *"not added the source repo that hosts the Podspec to your Podfile."*
 - There is no flag to point `pod install` at an alternate Podfile path.
 
-**A source must be declared in the Podfile itself.** There is no way to add one invisibly for a single `pod install` run — full stop, not a workaround-able limitation.
+**A source must be declared in the Podfile itself** — true of the `pod` CLI binary, which only ever gets a `Podfile` object by reading the file on disk. There is no way to add a source invisibly for a single `pod install` run through that binary.
 
-**Current plan**: until Milestone 6 (where Zorvok's own Ruby shim calls `cocoapods-core`/`molinillo` directly instead of going through `pod install`'s own source resolution, per ADR 0002 Phase 3+), using the Zorvok registry requires the same one-line opt-in any CocoaPods private registry already requires today:
+**This is no longer a dead end: [ADR 0005](docs/adr/0005-native-installer-and-federation-mechanism.md) found and verified a real way around it, one milestone early.** `Pod::Config#podfile` has a public writer, and `Pod::Podfile.from_ruby(path, contents)` only reads `path` from disk when `contents` is nil. So Zorvok's own Ruby shim (`engines/cocoapods/installer/zorvok_install.rb`, driven via `zorvok install --native`) reads the real Podfile itself, prepends any federated `source` lines to that content *in memory only*, and hands the augmented string to `Pod::Installer` directly — the same `Pod::Installer` class `pod install` itself calls, just supplied a Podfile object the file on disk never had written to it. Verified: a pod declared nowhere in the Podfile and sourced from nowhere the Podfile names resolves correctly via `zorvok install --native --source <url>`, and the Podfile's bytes on disk are unchanged before and after (`TestInstallNativeFederatesUndeclaredDependency`). With no `--source` given, the native path produces a byte-identical `Podfile.lock` to the delegated path (`TestInstallNativeMatchesDelegatedInstall`) — the ADR 0002 differential-testing requirement, satisfied for the baseline case.
 
-```ruby
-source 'https://cdn.cocoapods.org/'
-source 'https://registry.zorvok.dev/cdn'   # one line, added once, like any private spec repo
-```
+This is still opt-in (`--native`), still gated per ADR 0002's "ships behind a flag... before becoming default," and the Zorvok registry doesn't yet speak the CocoaPods CDN/Specs protocol a `--source` URL needs to respond to (ARCHITECTURE.md's own CDN design in §2.4 is not yet built against — see ROADMAP.md). But the mechanical blocker ADR 0004 found is resolved, earlier than the roadmap originally expected.
 
-This is not a Zorvok-specific migration step; it's normal CocoaPods practice, and it doesn't conflict with "no Podfile changes to keep consuming your *existing* CocoaPods dependencies." It does mean Milestone 5, as originally scoped (automatic cross-registry resolution with zero Podfile awareness of Zorvok), is not achievable yet — see ROADMAP.md for the re-scoped version.
-
-Once Zorvok does own resolution (Milestone 6) and can inject sources programmatically, the precedence rules below still apply and are worth keeping as the target design:
+The precedence rules below still describe the target design for when Zorvok's own federation logic picks which source(s) to pass to `--source` automatically, rather than a developer specifying one by hand:
 
 - A pod name that is **registered as owned on the Zorvok registry** always resolves from Zorvok for that name, even if a same-named pod exists on the CocoaPods registry — this is the dependency-confusion guard (brief §9/§4 "never silently replace a package with one from a different registry").
 - A pod **not present on Zorvok** falls through to CocoaPods CDN, unchanged behavior from today.

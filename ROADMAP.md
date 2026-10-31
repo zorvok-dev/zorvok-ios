@@ -71,8 +71,21 @@ What's covered, with real tests, not just described:
 
 **True automatic, zero-Podfile-touch federation — the original Milestone 5 goal — moves to Milestone 6**, where it's actually achievable: once Zorvok's own resolver controls the source list programmatically, the precedence rules in ADR 0003/ARCHITECTURE.md §2.3 apply for real, and the dependency-confusion adversarial review happens before *that* ships.
 
-## Milestone 6 — Independent installation engine
-Phase 3 of ADR 0002: resolution moves from delegated `pod install` to a narrower Ruby shim calling `cocoapods-core` + `molinillo` + `xcodeproj` directly. This is also where real registry federation (originally Milestone 5's goal) becomes achievable, since Zorvok's resolver can inject sources programmatically without needing a Podfile `source` line (ADR 0004) — the precedence rules in ADR 0003 apply here, gated by the dependency-confusion adversarial review ARCHITECTURE.md §5 calls for. Ships behind a flag with differential testing against the delegated path before becoming default. Xcode project generation remains on `xcodeproj` — not reimplemented, ever (ADR 0002).
+## Milestone 6 — Independent installation engine 🚧
+Phase 3 of ADR 0002, first increment done: **[ADR 0005](docs/adr/0005-native-installer-and-federation-mechanism.md)**. `zorvok install --native [--source <url> ...]` drives `Pod::Installer` directly (the same class `pod install` itself uses — Molinillo still resolves, `xcodeproj` still generates the project, nothing reimplemented), supplying an in-memory-augmented Podfile instead of letting CocoaPods read the file a second time. This is the resolution to ADR 0004's blocker: a federated source is injected without ever writing to the Podfile on disk.
+
+Verified, not just described:
+- `TestInstallNativeMatchesDelegatedInstall`: with no `--source`, the native path produces a **byte-identical** `Podfile.lock` to the delegated path — the differential-testing requirement ADR 0002 sets as the bar before this can ever become default.
+- `TestInstallNativeFederatesUndeclaredDependency`: a pod named nowhere in the Podfile, sourced from nowhere the Podfile names, resolves via an injected `--source` — and the Podfile's bytes on disk are confirmed unchanged before/after.
+- Both run fully isolated (`CP_HOME_DIR` pointed at a temp dir — a CocoaPods-native override, not a Zorvok one) with no network access and no shared state with a real machine's `~/.cocoapods`; the same flow was also run by hand through the compiled `zorvok` binary against this machine's real CocoaPods install.
+- `engines/cocoapods/adapter`'s Ruby-environment resolution (finding the right `ruby` interpreter + `GEM_HOME` from wherever `pod` itself is installed — Homebrew's isolated-Cellar shape and a plain `gem install cocoapods` shape are both handled, unit tested with synthetic fixtures) is its own small, necessary piece of portability work this needed.
+
+**Still open, explicitly**:
+- `--native` is opt-in, not default (ADR 0002's own requirement) — `zorvok install` without `--native` is unchanged, still the Milestone 2 delegated path.
+- The Zorvok registry doesn't yet speak the CocoaPods CDN/Specs protocol a `--source` URL needs to respond to (ARCHITECTURE.md §2.4's CDN design). This milestone only proves the mechanism against a hand-built local git Specs repo fixture (`tests/fixtures/federated-specs-template`) — making `registry-server` itself servable as a `--source` target is separate, tracked work.
+- ADR 0003's precedence rules (ownership-wins, conflicting-version-is-a-hard-failure, provenance in Podfile.lock) are not implemented — this increment proves *a* source can be injected, not that *Zorvok's own resolver* picks which ones automatically or arbitrates between them.
+- The dependency-confusion adversarial review (ARCHITECTURE.md §5) is still required before any *automatic* (non-explicit `--source`) federation ships — this increment only makes explicit, developer-specified federation possible.
+- `pod lib lint`/`pod ipc spec` (used by `zorvok lib lint`/`trunk push`) still delegate to the `pod` CLI binary, unchanged — only `install` has a native path so far.
 
 ## Milestone 7 — Public launch
 CLI + Homebrew tap + website + documentation + public registry, all versioned and backward-compatible per the engineering rules below.

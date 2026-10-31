@@ -1,0 +1,12 @@
+platform :ios, '13.0'
+
+target 'FederatedApp' do
+  use_frameworks!
+  # Deliberately NOT declared with :path/:git, and no `source` line
+  # naming the federated-specs-template repo below — this Podfile has
+  # zero awareness of where FederatedPod comes from. Milestone 6's
+  # native installer resolves it anyway, by injecting that source in
+  # memory only (see zorvok_install.rb), proving federation works
+  # without ever writing to this file.
+  pod 'FederatedPod', '1.0.0'
+end
