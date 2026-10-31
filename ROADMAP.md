@@ -34,8 +34,21 @@ Status key: ✅ done · 🚧 in progress · ⬜ not started
 
 `engines/cocoapods/podfile`/`podspec` parsing (via `pod ipc`) for federation use is deferred to Milestone 5, since Phase 1 delegation doesn't need it yet.
 
-## Milestone 3 — Public registry
-`registry-server`: metadata API, versioning, search, storage, auth. No publishing from the CLI yet — server-side only, validated via direct API tests.
+## Milestone 3 — Public registry 🚧
+`registry-server` implements a versioned HTTP API (`registry-server/api`), package/version metadata with ownership and immutability (`registry-server/packages`), and Trunk-style email-verified session auth (`registry-server/auth`) — server-side only, no CLI wiring yet (that's Milestone 4). `cmd/zorvok-registry` runs it; verified end-to-end both via `go test ./registry-server/...` (httptest) and a real running server exercised with `curl` (register → verify → publish → get → duplicate-rejected).
+
+What's covered, with real tests, not just described:
+- **Ownership / package-takeover protection** (brief §9): first publisher of a name owns it; a different account publishing to that name is rejected (403) — `TestPublishRejectsNonOwner`.
+- **Immutability** (brief §9, ADR 0003): republishing an existing `(package, version)` is rejected (409), even with different content — `TestPublishRejectsDuplicateImmutably`.
+- **Auth gating**: publishing requires a verified session; an unverified account is rejected (403) even with a valid token — `TestPublishRejectsUnverifiedAccount`.
+- **No server-side code execution** (brief §9): a submitted podspec is validated structurally (must be JSON, `name`/`version` must match the request) and stored verbatim — never parsed as Ruby or executed.
+- **Rate limiting** (brief §9): a minimal per-IP fixed-window limiter, tested.
+
+**Not yet done, and explicitly not assumed**:
+- **PostgreSQL backend** — ADR 0003 calls for it; `registry-server/storage/postgres/schema.sql` documents the intended schema (with the DB-level `UNIQUE(package_name, version)` constraint ARCHITECTURE.md §2.4 calls for), but there's no `database/sql` implementation yet, and the schema itself is untested against a real database — this session's Docker daemon wasn't running. Only the in-memory store is implemented and used by `cmd/zorvok-registry` today; **all registry data is lost on restart**. See `registry-server/storage/README.md`.
+- **Real email delivery** — `auth.LogSender` logs verification links instead of sending them; a real provider is a drop-in `auth.EmailSender` implementation later, not a design change.
+- **Object storage / CDN for artifacts** — not needed yet; Milestone 3 is reference-only hosting (a podspec's `source` is a `:git`/`:http` URL, per ADR 0003's MVP scope).
+- **Ownership-precedence adversarial review** (ARCHITECTURE.md §5.4) — still required before Milestone 5 (federation) ships; Milestone 3's ownership model (first-publisher-wins) is necessary but not sufficient for that review.
 
 ## Milestone 4 — Publishing
 `zorvok login`, `zorvok trunk push`. Publish a real test podspec end-to-end. `internal/publisher` + server-side validation (ADR 0003 constraints: immutability, ownership, duplicate-version rejection).
