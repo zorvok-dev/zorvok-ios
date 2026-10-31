@@ -64,6 +64,19 @@ func commands() []command {
 		{"registry add-cdn", "Register a CDN-backed spec source, e.g. a Zorvok registry (delegates to `pod repo add-cdn`)", runRegistryAddCDN, true},
 		{"registry remove", "Unregister a spec source (delegates to `pod repo remove`)", runRegistryRemove, true},
 		{"registry update", "Update one or all registered spec sources (delegates to `pod repo update`)", runRegistryUpdate, true},
+		{"registry lint", "Validate every spec in a repo (delegates to `pod repo lint`)", delegateTo("repo", "lint"), true},
+		{"registry push", "Push specs to a git-backed spec repo (delegates to `pod repo push`)", delegateTo("repo", "push"), true},
+		{"lib create", "Scaffold a new pod (delegates to `pod lib create`)", delegateTo("lib", "create"), true},
+		{"spec", "Manage podspecs: cat/create/edit/lint/which (delegates to `pod spec`)", delegateTo("spec"), true},
+		{"cache", "Manipulate the local pod download cache: clean/list (delegates to `pod cache`)", delegateTo("cache"), true},
+		{"ipc", "Inter-process communication: podfile/podfile-json/spec/list/repl (delegates to `pod ipc`)", delegateTo("ipc"), true},
+		{"plugins", "List or search available CocoaPods plugins (delegates to `pod plugins`)", delegateTo("plugins"), true},
+		{"list", "List all available pods (delegates to `pod list`)", delegateTo("list"), true},
+		{"outdated", "Show outdated dependencies in the current Podfile.lock (delegates to `pod outdated`)", delegateTo("outdated"), true},
+		{"try", "Download a pod's demo project and open it (delegates to `pod try`)", delegateTo("try"), true},
+		{"env", "Display the local CocoaPods/Zorvok environment (delegates to `pod env`)", delegateTo("env"), true},
+		{"setup", "Set up the local CocoaPods environment (delegates to `pod setup`)", delegateTo("setup"), true},
+		{"deintegrate", "Remove all traces of CocoaPods from an Xcode project (delegates to `pod deintegrate`)", delegateTo("deintegrate"), true},
 	}
 }
 
