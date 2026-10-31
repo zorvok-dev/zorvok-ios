@@ -1,0 +1,2 @@
+@interface ResourceBundlePod : NSObject
+@end

@@ -1,0 +1,2 @@
+@interface GitPod : NSObject
+@end
