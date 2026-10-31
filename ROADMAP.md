@@ -29,7 +29,7 @@ Status key: ✅ done · 🚧 in progress · ⬜ not started
 | Multiple Xcode targets | `tests/fixtures/multi-target` — verifies per-target `Pods-<Target>` integration | ✅ |
 | Existing `Podfile.lock` (no drift on reinstall) | reuses `simple-project` | ✅ (`TestReinstallIsIdempotent`) |
 | Local path dependencies | covered by every fixture above | ✅ |
-| Binary frameworks / XCFrameworks | — | ⬜ not yet built |
+| Binary frameworks / XCFrameworks | `tests/fixtures/xcframework` — a real `.xcframework` built with `clang` + `xcodebuild -create-xcframework` (no full Xcode project needed); verifies the host app target gets wired to `PODS_XCFRAMEWORKS_BUILD_DIR` | ✅ |
 | An existing hand-authored `Podfile.lock` from a *different* CocoaPods version/project | — | ⬜ not yet built |
 
 `engines/cocoapods/podfile`/`podspec` parsing (via `pod ipc`) for federation use is deferred to Milestone 5, since Phase 1 delegation doesn't need it yet.

@@ -11,9 +11,9 @@
 // fail, when no local CocoaPods/git install is available, since
 // Milestone 2 still depends on one per ADR 0002.
 //
-// Not yet covered here: XCFrameworks/binary frameworks, an existing
-// hand-authored Podfile.lock from a different CocoaPods version. Tracked
-// in ROADMAP.md, not silently assumed to work.
+// Not yet covered here: an existing hand-authored Podfile.lock from a
+// different CocoaPods version/project. Tracked in ROADMAP.md, not
+// silently assumed to work.
 package compatibility
 
 import (
@@ -342,5 +342,40 @@ func TestGitDependencyResolves(t *testing.T) {
 	}
 	if !strings.Contains(lockStr, repoURL) {
 		t.Errorf("Podfile.lock should record the git source:\n%s", lockStr)
+	}
+}
+
+// TestXCFrameworkDependencyResolves verifies a pod distributed as a
+// prebuilt binary (`s.vendored_frameworks`, an .xcframework) rather than
+// source installs correctly and gets properly wired for linking — not
+// just that install exits zero. The fixture's .xcframework was built
+// with clang + `xcodebuild -create-xcframework` (see
+// tests/fixtures/xcframework/README.md); `pod install` only needs to
+// read its structure, so the committed binary is small and portable
+// across machines/architectures for this test's purposes (it is never
+// executed or compiled against here).
+func TestXCFrameworkDependencyResolves(t *testing.T) {
+	requirePod(t)
+
+	root := t.TempDir()
+	copyRel(t, root, "xcframework/pod")
+	copyRel(t, root, "xcframework/project")
+	projectDir := filepath.Join(root, "xcframework", "project")
+
+	mustInstall(t, projectDir, nil)
+
+	lockStr := readFile(t, filepath.Join(projectDir, "Podfile.lock"))
+	if !strings.Contains(lockStr, "XCFrameworkPod (0.1.0)") {
+		t.Errorf("Podfile.lock missing XCFrameworkPod:\n%s", lockStr)
+	}
+
+	pbxproj := readFile(t, filepath.Join(projectDir, "Pods", "Pods.xcodeproj", "project.pbxproj"))
+	if !strings.Contains(pbxproj, "ZorvokFixture") {
+		t.Error("expected the vendored xcframework's binary name to appear in the generated Pods project")
+	}
+
+	appProj := readFile(t, filepath.Join(projectDir, "XCFrameworkApp.xcodeproj", "project.pbxproj"))
+	if !strings.Contains(appProj, "PODS_XCFRAMEWORKS_BUILD_DIR") {
+		t.Error("expected the host app target to be wired to link against the xcframework via PODS_XCFRAMEWORKS_BUILD_DIR")
 	}
 }
