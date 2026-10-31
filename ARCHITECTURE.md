@@ -199,7 +199,7 @@ No code exists yet in any of these — directories are created empty/stubbed pen
 | Multiple targets/platforms, build configs | Inherited for free while delegating | Low | M2 |
 | CocoaPods plugins | Deferred — plugins hook into the `pod` CLI's Ruby plugin API; only reachable while we still shell to real `pod install` (Phase 1-2). Revisit explicitly before Phase 3 removes that path, or document the loss. | Medium (scope not yet sized) | Post-M2, revisit before M6 |
 
-**We will not claim "CocoaPods compatible" publicly until the acceptance test in §6 passes on a real, unmodified existing CocoaPods project**, per the brief's own instruction. As of Milestone 2's current state: `zorvok install`/`update`/`lib lint` work and are verified end-to-end against real (not mocked) CocoaPods for simple, transitive, subspec, git, resource-bundle, and multi-target fixtures — see the coverage table in [ROADMAP.md](ROADMAP.md) Milestone 2. Binary frameworks/XCFrameworks and an existing hand-authored `Podfile.lock` from a different project are not yet covered, so the broader compatibility claim is not yet made.
+**We will not claim "CocoaPods compatible" publicly until the acceptance test in §6 passes on a real, unmodified existing CocoaPods project**, per the brief's own instruction. As of Milestone 2's current state: `zorvok install`/`update`/`lib lint` work and are verified end-to-end against real (not mocked) CocoaPods for simple, transitive, subspec, git, resource-bundle, multi-target, and XCFramework fixtures — see the coverage table in [ROADMAP.md](ROADMAP.md) Milestone 2. Only an existing hand-authored `Podfile.lock` from a different CocoaPods version/project is not yet covered, so the broader compatibility claim is not yet made.
 
 ## 5. Technical risks
 

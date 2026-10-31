@@ -9,7 +9,7 @@
 # files are checked into the repo; re-run this only if a fixture needs to
 # change.
 #
-# Usage: ruby tests/fixtures/generate_simple_project.rb
+# Usage: ruby tests/fixtures/generate_projects.rb
 
 require "xcodeproj"
 
@@ -22,6 +22,7 @@ PROJECTS = [
   ["resource-bundle/project", "ResourceBundleApp", ["ResourceBundleApp"]],
   ["multi-target/project", "MultiTargetApp", ["AppOne", "AppTwo"]],
   ["git-dependency/project", "GitApp", ["GitApp"]],
+  ["xcframework/project", "XCFrameworkApp", ["XCFrameworkApp"]],
 ]
 
 PROJECTS.each do |dir, name, targets|
