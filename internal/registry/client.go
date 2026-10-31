@@ -1,7 +1,6 @@
 // Package registry is a Go client for the Zorvok registry's HTTP API
-// (registry-server/api). Milestone 4 uses it for `zorvok login`/`trunk
-// push`; `zorvok search`/`info` (Milestone 3's CLI wiring) and
-// federation (Milestone 5) will use the same client.
+// (registry-server/api). Used by `zorvok login`/`trunk push`,
+// `zorvok search`/`info`, and internal/publisher.
 package registry
 
 import (
@@ -11,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -99,16 +99,25 @@ type PackageInfo struct {
 	Versions           []string `json:"versions"`
 }
 
-// GetPackage fetches a package's metadata. Not yet wired into any CLI
-// command (that's `zorvok info`, Milestone 3's still-pending CLI work),
-// but implemented now since internal/publisher's tests exercise it via
-// a real httptest server.
+// GetPackage fetches a package's metadata — used by `zorvok info`.
 func (c *Client) GetPackage(ctx context.Context, name string) (*PackageInfo, error) {
 	var resp PackageInfo
 	if err := c.do(ctx, "GET", "/v1/packages/"+name, "", nil, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
+}
+
+// Search queries the registry for packages matching query (a
+// case-insensitive substring match, server-side — registry-server/api's
+// handleSearch) — used by `zorvok search`.
+func (c *Client) Search(ctx context.Context, query string) ([]PackageInfo, error) {
+	var resp []PackageInfo
+	path := "/v1/search?q=" + url.QueryEscape(query)
+	if err := c.do(ctx, "GET", path, "", nil, &resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (c *Client) do(ctx context.Context, method, path, sessionToken string, body, out any) error {

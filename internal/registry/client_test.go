@@ -131,3 +131,31 @@ func TestGetPackageNotFound(t *testing.T) {
 		t.Fatalf("got %v, want *APIError with status 404", err)
 	}
 }
+
+func TestSearch(t *testing.T) {
+	client, sender := newTestRegistry(t)
+	ctx := context.Background()
+	token := registerAndVerify(t, client, sender, "dev@example.com")
+
+	for _, name := range []string{"Alamofire", "SDWebImage"} {
+		if _, err := client.PublishVersion(ctx, token, name, "1.0.0", `{"name":"`+name+`","version":"1.0.0"}`, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	results, err := client.Search(ctx, "ala")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Name != "Alamofire" {
+		t.Fatalf("unexpected results: %+v", results)
+	}
+
+	all, err := client.Search(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("expected 2 results for an empty query, got %d", len(all))
+	}
+}
