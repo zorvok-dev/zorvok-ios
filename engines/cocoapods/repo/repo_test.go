@@ -2,20 +2,12 @@ package repo
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
 	"testing"
+
+	"github.com/zorvok-dev/zorvok-ios/internal/testutil"
 )
 
-func stubPod(t *testing.T, script string) {
-	t.Helper()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "pod")
-	if err := os.WriteFile(path, []byte("#!/bin/sh\n"+script+"\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-}
+var stubPod = testutil.StubPod
 
 func TestListForwardsArgv(t *testing.T) {
 	stubPod(t, `echo "$@"`)
