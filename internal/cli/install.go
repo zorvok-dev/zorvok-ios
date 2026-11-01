@@ -89,10 +89,10 @@ func parseInstallArgs(args []string) (native bool, sources []string, noRegistry 
 		}
 	}
 	if !native && len(sources) > 0 {
-		return false, nil, false, nil, fmt.Errorf("--source requires --native (the delegated `pod install` path has no mechanism to use extra sources — see ADR 0004)")
+		return false, nil, false, nil, fmt.Errorf("--source requires --native (the delegated `pod install` path has no mechanism to use extra sources)")
 	}
 	if !native && noRegistry {
-		return false, nil, false, nil, fmt.Errorf("--no-registry requires --native (automatic registry federation only applies to the native installer — see ADR 0008)")
+		return false, nil, false, nil, fmt.Errorf("--no-registry requires --native (automatic registry federation only applies to the native installer)")
 	}
 	return native, sources, noRegistry, rest, nil
 }
