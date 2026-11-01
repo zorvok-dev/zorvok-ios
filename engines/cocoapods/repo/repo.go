@@ -5,7 +5,7 @@
 package repo
 
 import (
-	"fmt"
+	"errors"
 	"io"
 
 	"github.com/zorvok-dev/zorvok-ios/engines/cocoapods/adapter"
@@ -23,7 +23,7 @@ func List(out, errOut io.Writer, dir string, extraArgs []string) error {
 // git-backed spec repo.
 func Add(out, errOut io.Writer, dir, name, url string, extraArgs []string) error {
 	if name == "" || url == "" {
-		return fmt.Errorf("usage: zorvok registry add <name> <url> [branch]")
+		return errors.New("usage: zorvok registry add <name> <url> [branch]")
 	}
 	if _, err := adapter.Find(); err != nil {
 		return err
@@ -38,7 +38,7 @@ func Add(out, errOut io.Writer, dir, name, url string, extraArgs []string) error
 // for use in a Podfile `source` line, as opposed to Add (git-backed).
 func AddCDN(out, errOut io.Writer, dir, name, url string, extraArgs []string) error {
 	if name == "" || url == "" {
-		return fmt.Errorf("usage: zorvok registry add-cdn <name> <url>")
+		return errors.New("usage: zorvok registry add-cdn <name> <url>")
 	}
 	if _, err := adapter.Find(); err != nil {
 		return err
@@ -50,7 +50,7 @@ func AddCDN(out, errOut io.Writer, dir, name, url string, extraArgs []string) er
 // Remove runs `pod repo remove <name>`.
 func Remove(out, errOut io.Writer, dir, name string, extraArgs []string) error {
 	if name == "" {
-		return fmt.Errorf("usage: zorvok registry remove <name>")
+		return errors.New("usage: zorvok registry remove <name>")
 	}
 	if _, err := adapter.Find(); err != nil {
 		return err

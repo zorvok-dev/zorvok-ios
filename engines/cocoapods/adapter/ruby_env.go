@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -22,8 +23,6 @@ type RubyEnv struct {
 	// variable for RubyPath to find the `cocoapods` gem.
 	GemHome string
 }
-
-var shebangRe = regexp.MustCompile(`^#!\s*(\S+)`)
 
 // gemHomeExecRe matches Homebrew's generated wrapper shape:
 //
@@ -96,9 +95,23 @@ func readShebang(path string) (string, error) {
 	if !scanner.Scan() {
 		return "", fmt.Errorf("empty file")
 	}
-	m := shebangRe.FindStringSubmatch(scanner.Text())
-	if m == nil {
-		return "", nil
+	return parseShebang(scanner.Text()), nil
+}
+
+// parseShebang extracts the interpreter named by a shebang line,
+// resolving one layer of `env` indirection: `#!/usr/bin/env ruby` and
+// `#!/usr/bin/env bash` resolve to "ruby" and "bash", not the literal
+// "/usr/bin/env" — version managers like rbenv generate their shims
+// this way, and treating "/usr/bin/env" itself as the interpreter
+// would try to run a nonexistent "/usr/bin/env" binary as Ruby.
+func parseShebang(line string) string {
+	fields := strings.Fields(strings.TrimPrefix(line, "#!"))
+	if len(fields) == 0 || !strings.HasPrefix(line, "#!") {
+		return ""
 	}
-	return m[1], nil
+	interpreter := fields[0]
+	if filepath.Base(interpreter) == "env" && len(fields) > 1 {
+		interpreter = fields[1]
+	}
+	return interpreter
 }

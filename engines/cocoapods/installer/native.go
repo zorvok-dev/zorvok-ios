@@ -2,7 +2,9 @@ package installer
 
 import (
 	_ "embed"
+	"fmt"
 	"io"
+	"path/filepath"
 
 	"github.com/zorvok-dev/zorvok-ios/engines/cocoapods/adapter"
 )
@@ -27,6 +29,16 @@ func InstallNative(out, errOut io.Writer, dir string, extraSources []string) err
 	if err := requirePodfile(dir); err != nil {
 		return err
 	}
-	args := append([]string{dir}, extraSources...)
-	return adapter.RunRubyScript(out, errOut, dir, nativeInstallScript, args...)
+	// The Ruby shim receives dir twice: as the subprocess's own working
+	// directory (adapter.RunRubyScript's dir param) and, separately, as
+	// ARGV[0], which it resolves relative to that same working
+	// directory. A relative dir would double up (<cwd>/dir/dir) in the
+	// script's own resolution; absolute avoids that regardless of what
+	// the caller passed.
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("resolve project directory: %w", err)
+	}
+	args := append([]string{absDir}, extraSources...)
+	return adapter.RunRubyScript(out, errOut, absDir, nativeInstallScript, args...)
 }

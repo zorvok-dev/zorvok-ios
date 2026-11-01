@@ -100,6 +100,7 @@ func mustInstall(t *testing.T, dir string, extraArgs []string) (stdout, stderr s
 // installation, unmodified Podfile, and a reproducible lockfile.
 func TestSimpleLocalPathDependency(t *testing.T) {
 	requirePod(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
 
 	root := t.TempDir()
 	copyRel(t, root, "local-pod")
@@ -138,6 +139,7 @@ func TestSimpleLocalPathDependency(t *testing.T) {
 // projects do.
 func TestReinstallIsIdempotent(t *testing.T) {
 	requirePod(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
 
 	root := t.TempDir()
 	copyRel(t, root, "local-pod")
@@ -160,6 +162,7 @@ func TestReinstallIsIdempotent(t *testing.T) {
 // recorded in the lockfile's dependency graph.
 func TestTransitiveDependencyResolves(t *testing.T) {
 	requirePod(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
 
 	root := t.TempDir()
 	copyRel(t, root, "transitive/pod-a")
@@ -182,6 +185,7 @@ func TestTransitiveDependencyResolves(t *testing.T) {
 // PodB actually needs must fail to install, with a clear diagnostic.
 func TestTransitiveDependencyMissingPathFails(t *testing.T) {
 	requirePod(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
 
 	root := t.TempDir()
 	copyRel(t, root, "transitive/pod-a")
@@ -204,6 +208,7 @@ func TestTransitiveDependencyMissingPathFails(t *testing.T) {
 // the generated Pods project.
 func TestSubspecInstallsOnlyDeclaredSubspec(t *testing.T) {
 	requirePod(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
 
 	root := t.TempDir()
 	copyRel(t, root, "subspecs/pod")
@@ -234,6 +239,7 @@ func TestSubspecInstallsOnlyDeclaredSubspec(t *testing.T) {
 // project — not just that install exits zero.
 func TestResourceBundleGeneratesBundleTarget(t *testing.T) {
 	requirePod(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
 
 	root := t.TempDir()
 	copyRel(t, root, "resource-bundle/pod")
@@ -256,6 +262,7 @@ func TestResourceBundleGeneratesBundleTarget(t *testing.T) {
 // "Pods-<Target>" integration and the union of pods in the lockfile.
 func TestMultiTargetInstallsPerTargetPods(t *testing.T) {
 	requirePod(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
 
 	root := t.TempDir()
 	copyRel(t, root, "transitive/pod-a")
@@ -287,6 +294,7 @@ func TestMultiTargetInstallsPerTargetPods(t *testing.T) {
 func TestGitDependencyResolves(t *testing.T) {
 	requirePod(t)
 	requireGit(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
 
 	root := t.TempDir()
 	copyRel(t, root, "git-dependency/git-pod-source")
