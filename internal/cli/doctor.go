@@ -5,6 +5,7 @@ import (
 	"io"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/zorvok-dev/zorvok-ios/internal/auth"
@@ -26,16 +27,15 @@ type checkResult struct {
 }
 
 // runDoctor diagnoses the local environment. Ruby/CocoaPods checks are
-// reported as warnings, not failures, in Milestone 1: `zorvok install`
-// doesn't exist yet, so their absence doesn't block anything a Milestone-1
-// user can actually do — but surfacing them now means `zorvok doctor`
-// already tells the truth about what Milestone 2 will need.
+// reported as warnings rather than failures — `zorvok install` falls
+// back to delegating to a real `pod install`, so a missing Ruby/
+// CocoaPods toolchain doesn't block every command, only that one.
 func runDoctor(out, errOut io.Writer, _ []string) int {
 	var results []checkResult
 
 	results = append(results, checkPlatform())
-	results = append(results, checkTool("git", "git --version", "needed for git: dependencies (M2)", statusWarn))
-	results = append(results, checkTool("ruby", "ruby -v", "needed to run `pod install` during Milestones 2-5 (ADR 0002)", statusWarn))
+	results = append(results, checkTool("git", "git", "git --version", "needed for git: dependencies", statusWarn))
+	results = append(results, checkTool("ruby", "ruby", "ruby -v", "needed to run `pod install`", statusWarn))
 	results = append(results, checkCocoaPods())
 	results = append(results, checkConfigDir())
 	results = append(results, checkAuth())
@@ -75,33 +75,36 @@ func checkPlatform() checkResult {
 	}
 }
 
-// checkTool verifies a binary is on PATH and reports its version output.
-func checkTool(name, versionCmd, missingHint string, missingSeverity checkStatus) checkResult {
-	path, err := exec.LookPath(name)
+// checkTool verifies binaryName is on PATH and reports its version
+// output under displayName (which may differ — `pod` is reported as
+// "cocoapods"). versionPrefix is prepended to an OK result's version
+// string, for tools like `pod --version` whose output is a bare number
+// with no "git version"/"ruby" style prefix of its own.
+func checkTool(binaryName, displayName, versionCmd, missingHint string, missingSeverity checkStatus) checkResult {
+	path, err := exec.LookPath(binaryName)
 	if err != nil {
-		return checkResult{missingSeverity, name, "not found on PATH — " + missingHint}
+		return checkResult{missingSeverity, displayName, "not found on PATH — " + missingHint}
 	}
 
 	parts := strings.Fields(versionCmd)
 	out, err := exec.Command(parts[0], parts[1:]...).Output()
 	version := strings.TrimSpace(string(out))
-	if err != nil || version == "" {
-		return checkResult{statusWarn, name, path + " (found, but couldn't read version)"}
+	switch {
+	case err != nil:
+		return checkResult{statusWarn, displayName, fmt.Sprintf("%s (found, but %q failed: %v)", path, versionCmd, err)}
+	case version == "":
+		return checkResult{statusWarn, displayName, path + " (found, but couldn't read version)"}
+	default:
+		return checkResult{statusOK, displayName, firstLine(version) + "  (" + path + ")"}
 	}
-	return checkResult{statusOK, name, firstLine(version) + "  (" + path + ")"}
 }
 
 func checkCocoaPods() checkResult {
-	path, err := exec.LookPath("pod")
-	if err != nil {
-		return checkResult{statusWarn, "cocoapods", "`pod` not found on PATH — needed for `zorvok install` (M2); install with `gem install cocoapods`"}
+	r := checkTool("pod", "cocoapods", "pod --version", "needed for `zorvok install`; install with `gem install cocoapods`", statusWarn)
+	if r.status == statusOK {
+		r.detail = "v" + r.detail
 	}
-	out, err := exec.Command("pod", "--version").Output()
-	version := strings.TrimSpace(string(out))
-	if err != nil || version == "" {
-		return checkResult{statusWarn, "cocoapods", path + " (found, but `pod --version` failed)"}
-	}
-	return checkResult{statusOK, "cocoapods", "v" + firstLine(version) + "  (" + path + ")"}
+	return r
 }
 
 func checkConfigDir() checkResult {
@@ -121,6 +124,10 @@ func checkAuth() checkResult {
 	if len(hosts) == 0 {
 		return checkResult{statusWarn, "auth", "not logged in to any registry — run `zorvok login <email>` to publish with `zorvok trunk push`"}
 	}
+	// Hosts() iterates a map; sort so this line's order is stable
+	// across runs instead of changing from one `zorvok doctor` call to
+	// the next with no underlying change.
+	sort.Strings(hosts)
 	return checkResult{statusOK, "auth", fmt.Sprintf("logged in to: %s", strings.Join(hosts, ", "))}
 }
 
