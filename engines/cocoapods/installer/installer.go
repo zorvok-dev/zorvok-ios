@@ -5,6 +5,7 @@
 package installer
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,10 +16,11 @@ import (
 
 // ErrNoPodfile is returned when dir has no Podfile. Zorvok manages
 // existing CocoaPods projects; it does not scaffold a new Podfile.
-var ErrNoPodfile = fmt.Errorf("no Podfile found")
+var ErrNoPodfile = errors.New("no Podfile found")
 
 func requirePodfile(dir string) error {
-	if _, err := os.Stat(filepath.Join(dir, "Podfile")); err != nil {
+	info, err := os.Stat(filepath.Join(dir, "Podfile"))
+	if err != nil || info.IsDir() {
 		return fmt.Errorf("%w in %s — zorvok manages existing CocoaPods projects; run `pod init` first, or add a Podfile manually", ErrNoPodfile, dir)
 	}
 	return nil

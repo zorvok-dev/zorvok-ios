@@ -69,7 +69,7 @@ end
 
 project_dir = ARGV[0]
 fail_with('missing project directory argument') if project_dir.nil? || project_dir.empty?
-extra_sources = ARGV[1..] || []
+extra_sources = ARGV[1..]
 
 config = Pod::Config.instance
 config.installation_root = Pathname.new(project_dir)
