@@ -1,10 +1,7 @@
-// Package repo implements `zorvok registry list/add/add-cdn/remove/update`
-// by delegating to the real `pod repo` subcommands (ADR 0002: don't
-// reimplement a CocoaPods compatibility surface we don't need to own).
-// This is CocoaPods' own mechanism for registering a named, locally
-// cloned spec source (git- or CDN-backed) that a Podfile's `source`
-// line — or Zorvok's own `--source`/`registry_url` federation — can
-// then point at.
+// Package repo wraps `pod repo list/add/add-cdn/remove/update` for
+// `zorvok registry`. This is how a named spec source — git- or
+// CDN-backed — gets registered for a Podfile `source` line, or for
+// Zorvok's own federation, to point at.
 package repo
 
 import (

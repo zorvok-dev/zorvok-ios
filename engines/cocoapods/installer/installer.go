@@ -1,9 +1,7 @@
-// Package installer implements `zorvok install`/`zorvok update` for
-// Milestone 2: Phase 1 of ADR 0002, meaning it delegates resolution and
-// Xcode integration entirely to the real `pod install`/`pod update`
-// binary rather than reimplementing them. Zorvok's value here is the
-// preflight checks and error messages around that delegation, not the
-// installation logic itself.
+// Package installer implements `zorvok install`/`update` by delegating
+// resolution and Xcode integration to the real `pod install`/`update`
+// binary. It owns the preflight checks and error messages around that
+// delegation, not the install logic itself.
 package installer
 
 import (

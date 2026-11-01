@@ -1,10 +1,7 @@
-// Package registrytest starts a real zorvok-registry binary as a
-// subprocess for tests, instead of importing the registry server's Go
-// packages directly — those now live in a separate repository
-// (zorvok-dev/zorvok-registry-ios, zorvok ADR 0009), so cross-repo Go
-// imports aren't possible any more. This mirrors the existing pattern
-// of testing against a real `pod`/`git` binary on PATH: skip, don't
-// fail, when the binary isn't available.
+// Package registrytest runs a real zorvok-registry binary as a
+// subprocess for tests, since that server now lives in a separate
+// repo. Mirrors the existing pattern of testing against a real
+// `pod`/`git` on PATH: skip, don't fail, if the binary isn't there.
 package registrytest
 
 import (

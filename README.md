@@ -6,7 +6,9 @@ This repository is the `zorvok` CLI. It is iOS-only — no Android, Maven, or Gr
 
 ## How it works, in one paragraph
 
-Zorvok does not reimplement CocoaPods. Dependency resolution (Molinillo), Podfile.lock generation, and Xcode project integration (`xcodeproj`) are all exactly CocoaPods' own code — by default, `zorvok install`/`zorvok update`/`zorvok lib lint` simply shell out to the real `pod` binary you already have installed (`gem install cocoapods`), so Zorvok can never diverge from CocoaPods' actual installed behavior. Everything registry-related — `trunk push`, `search`, `info`, multi-source federation — is Zorvok's own addition layered on top. The one deeper piece Zorvok does own is `zorvok install --native`, an opt-in installer that drives CocoaPods' own `Pod::Installer` class directly (not a reimplementation of it) so it can resolve a dependency from an additional registry that is declared nowhere in your Podfile, without ever writing to that Podfile. See [ARCHITECTURE.md](ARCHITECTURE.md) and [docs/adr/](docs/adr/) for the full reasoning behind each of these decisions.
+Zorvok does not reimplement CocoaPods. By default, `zorvok install`/`update`/`lib lint` simply shell out to the real `pod` binary you already have installed — dependency resolution, Podfile.lock generation, and Xcode project integration are all exactly CocoaPods' own code, so Zorvok can't diverge from CocoaPods' actual behavior. Everything registry-related — `trunk push`, `search`, `info`, multi-source federation — is Zorvok's own addition on top.
+
+The one deeper piece Zorvok owns is `zorvok install --native`, an opt-in installer that drives CocoaPods' own `Pod::Installer` class directly, so it can resolve a dependency from an additional registry that's declared nowhere in your Podfile without ever writing to it. Design rationale: [ARCHITECTURE.md](ARCHITECTURE.md) and [docs/adr/](docs/adr/).
 
 ## The registry ecosystem: three tiers, one protocol
 
@@ -18,11 +20,11 @@ A Zorvok-aware (or even a plain CocoaPods) project can resolve dependencies from
 | 2 | Zorvok's own free public registry | [zorvok-dev/zorvok-specs](https://github.com/zorvok-dev/zorvok-specs) — static files in git, served via GitHub Pages/raw git, no server | Free |
 | 3 | A self-hosted registry, for private/enterprise use | [zorvok-dev/zorvok-registry-ios](https://github.com/zorvok-dev/zorvok-registry-ios) — a real Go server, Nexus/Artifactory-style | Whatever you host it on |
 
-All three speak the same CocoaPods CDN source protocol, so they're reached the exact same way: `zorvok install --native --source <url>`, or automatically once `registry_url` is configured (`zorvok config set registry_url <url> --global` — see [ADR 0008](docs/adr/0008-automatic-federation.md)). `zorvok install` doesn't know or care which kind of thing answers at that URL. (Rationale for the three-tier split: [ADR 0009](docs/adr/0009-three-tier-registry-model.md).)
+All three speak the same CocoaPods CDN source protocol, so they're reached the exact same way: `zorvok install --native --source <url>`, or automatically once `registry_url` is configured (`zorvok config set registry_url <url> --global`). `zorvok install` doesn't know or care which kind of thing answers at that URL.
 
 ## Installing the CLI
 
-**Build from source** (the verified, documented path):
+**Build from source:**
 
 ```bash
 git clone https://github.com/zorvok-dev/zorvok-ios.git
@@ -31,13 +33,13 @@ go build -o zorvok ./cmd/zorvok
 ./zorvok --version
 ```
 
-**`go install`, no clone needed** (works today against this public repository — verified against the real module path):
+**Or `go install`, no clone needed:**
 
 ```bash
 go install github.com/zorvok-dev/zorvok-ios/cmd/zorvok@main
 ```
 
-**Homebrew — not live yet.** A real, verified Homebrew formula exists at [zorvok-dev/homebrew-tap](https://github.com/zorvok-dev/homebrew-tap) (`brew install`/`brew test`/`brew audit --strict`/`brew style` all pass against it), but `brew install zorvok` can't work until this repository has a tagged release for the formula's `url`/`sha256` to resolve against — see that tap repo's own README for the exact release process. Once that lands, the install step will be exactly:
+**Homebrew** will eventually be the easiest path: the formula at [zorvok-dev/homebrew-tap](https://github.com/zorvok-dev/homebrew-tap) is built and passes `brew install`/`test`/`audit --strict`/`style` already, but it needs a tagged release on this repo before `brew install zorvok` actually resolves — see that tap repo's README for the release steps. Once that lands:
 
 ```bash
 brew install zorvok-dev/tap/zorvok
@@ -55,7 +57,7 @@ zorvok install                  # delegates straight to `pod install` — byte-i
 zorvok update                   # delegates straight to `pod update`
 ```
 
-At this point nothing about your project has changed from a plain CocoaPods workflow — `zorvok install`/`zorvok update` are drop-in replacements, verified byte-for-byte identical to the delegated `pod install`/`pod update` they wrap (see [ARCHITECTURE.md](ARCHITECTURE.md) and the compatibility fixtures under `tests/fixtures/`).
+At this point nothing about your project has changed from a plain CocoaPods workflow — `zorvok install`/`update` are drop-in replacements for `pod install`/`update`, down to producing a byte-identical `Podfile.lock`.
 
 ### Opting in to Zorvok's own registries
 
@@ -71,7 +73,7 @@ zorvok install --native
 zorvok install --native --no-registry   # opt out for a single run, once configured
 ```
 
-`--native` is required to use `--source`/auto-federation: `pod install` itself has no mechanism to use an extra source not declared in the Podfile (confirmed against real CocoaPods, not assumed — see [ADR 0004](docs/adr/0004-federation-requires-podfile-source-line.md)). `--native` drives CocoaPods' own `Pod::Installer` directly instead, verified to produce a byte-identical `Podfile.lock` to the delegated path when no extra source is used, and to never modify the Podfile on disk either way ([ADR 0005](docs/adr/0005-native-installer-and-federation-mechanism.md)). A same-name, same-version pod resolvable from two different sources is hard-refused before anything is downloaded, rather than silently picked by source declaration order — a real CocoaPods behavior reproduced and fixed before this was automated ([ADR 0007](docs/adr/0007-federation-safety-fixes.md)).
+`--native` is required for `--source`/auto-federation — plain `pod install` has no way to resolve a source that isn't declared in the Podfile. `--native` drives CocoaPods' own `Pod::Installer` directly instead: same lockfile output when no extra source is given, and the Podfile on disk is never touched. If the same pod and version is resolvable from two different sources, Zorvok refuses rather than silently picking one by declaration order, which is what plain CocoaPods itself does in that situation. Design notes: [ADR 0004](docs/adr/0004-federation-requires-podfile-source-line.md), [ADR 0005](docs/adr/0005-native-installer-and-federation-mechanism.md), [ADR 0007](docs/adr/0007-federation-safety-fixes.md).
 
 ### Publishing your own package
 
@@ -157,7 +159,7 @@ Run `zorvok <command> --help` (for anything that delegates to `pod`) or `zorvok 
 ## Architecture and design decisions
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — component design, CocoaPods compatibility assessment, registry design, risks, acceptance criteria
-- [docs/adr/](docs/adr/) — one architecture decision record per major decision, including the dead ends (e.g. [ADR 0004](docs/adr/0004-federation-requires-podfile-source-line.md), where testing the real mechanism before building on it caught that the original plan wasn't achievable, and the re-scope that followed)
+- [docs/adr/](docs/adr/) — one architecture decision record per major decision, dead ends included
 - [ROADMAP.md](ROADMAP.md) — milestone history and current status
 
 ## Running the test suite
@@ -178,8 +180,6 @@ Most packages are self-contained. A few need extra local setup to exercise real 
 If your terminal isn't using a UTF-8 locale, set `LANG=en_US.UTF-8` first — CocoaPods itself requires it and will otherwise emit confusing Ruby encoding errors from scripts it runs, not a Zorvok bug.
 
 ## Known gaps
-
-Stated plainly rather than silently assumed away:
 
 - `zorvok-registry-ios` has no PostgreSQL backend yet (in-memory store only — data is lost on restart) and no real email transport (verification links are logged, not emailed).
 - `zorvok trunk push` doesn't yet publish to the static `zorvok-specs` registry (Tier 2) — only to a live `zorvok-registry-ios` server. Publishing to `zorvok-specs` is PR-based for now; see [its README](https://github.com/zorvok-dev/zorvok-specs#publishing-a-package).
