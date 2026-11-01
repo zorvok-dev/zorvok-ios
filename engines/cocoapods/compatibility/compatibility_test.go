@@ -385,9 +385,9 @@ func TestXCFrameworkDependencyResolves(t *testing.T) {
 // CocoaPods like every other command here. The scenario that actually
 // distinguishes `update` from `install`: a branch-tracking git
 // dependency (no :tag, so there's a real "newer commit" for update to
-// move to). Confirmed empirically before writing this test: plain
-// `pod install` never re-resolves a branch-tracking git source once
-// locked — only `pod update` does.
+// move to). Checked against real CocoaPods before writing this test:
+// plain `pod install` never re-resolves a branch-tracking git source
+// once locked — only `pod update` does.
 func TestUpdateMovesForwardButInstallStaysLocked(t *testing.T) {
 	requirePod(t)
 	requireGit(t)

@@ -1,0 +1,15 @@
+install! 'cocoapods', :integrate_targets => false
+platform :ios, '13.0'
+
+# Top-level side effect, deliberately outside any target block — a
+# marker that proves whether CocoaPods parsed this file once or twice.
+# A real Podfile can run arbitrary top-level Ruby here (a `puts`, a
+# shell-out, a `pre_install` hook registration via a side-effecting
+# `require`); Zorvok must never cause it to run more than the one time
+# a plain `pod install` would.
+File.open(ENV.fetch('ZORVOK_EVAL_MARKER'), 'a') { |f| f.puts 'eval' }
+
+target 'App' do
+  use_frameworks!
+  pod 'LocalPod', :path => '../local-pod'
+end

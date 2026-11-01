@@ -72,13 +72,13 @@ func TestInstallNativeRejectsSourceURLInjection(t *testing.T) {
 	}
 }
 
-// TestInstallNativeAbortsOnAmbiguousSource is the Milestone 6 security
-// fix (ADR 0007): two sources both have a spec for the same pod/version,
+// TestInstallNativeAbortsOnAmbiguousSource covers the security fix for
+// the case where two sources both have a spec for the same pod/version,
 // with no explicit `:source =>` pin. Real CocoaPods only warns and
-// silently picks one by declaration order (confirmed empirically before
-// this fix was written) — that's not safe enough for a tool whose whole
-// purpose is introducing a second (federated) source alongside the
-// first. The native installer must refuse instead.
+// silently picks one by declaration order — traced through its Source
+// code before writing this fix — which isn't safe enough for a tool
+// whose whole purpose is introducing a second (federated) source
+// alongside the first. The native installer must refuse instead.
 func TestInstallNativeAbortsOnAmbiguousSource(t *testing.T) {
 	requirePod(t)
 	requireGit(t)
