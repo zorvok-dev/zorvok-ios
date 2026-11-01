@@ -1,9 +1,6 @@
-// Package cli implements Zorvok's command routing. It knows nothing
-// about CocoaPods or the registry protocol directly — each command
-// delegates to the relevant internal/* or engines/* package. Milestone 1
-// implements version/help/init/config/doctor only; the remaining
-// commands are listed in help output as not-yet-implemented so the CLI
-// never silently no-ops on a real user command.
+// Package cli routes Zorvok's commands. It has no CocoaPods or
+// registry knowledge itself — each command delegates to internal/* or
+// engines/*.
 package cli
 
 import (

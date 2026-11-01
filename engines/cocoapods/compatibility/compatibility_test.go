@@ -1,19 +1,10 @@
-// Package compatibility holds Zorvok's CocoaPods compatibility test
-// suite (ARCHITECTURE.md §6). Per the roadmap, Zorvok does not claim
-// CocoaPods compatibility anywhere until these tests are green.
+// Package compatibility runs `zorvok install` against real `pod
+// install` — no mocks — using hermetic fixtures (local-path and
+// file:// git deps, no network, no Xcode.app). Tests skip rather than
+// fail if CocoaPods/git aren't installed locally.
 //
-// These tests exercise `zorvok install` against real `pod install` — no
-// mocking of CocoaPods itself — using fixtures deliberately built to be
-// hermetic: local-path and (via a git repo generated at test time on
-// disk) file:// git dependencies only, no network access, and no real
-// Xcode.app build required (only the `xcodeproj` gem, a CocoaPods
-// dependency, to read/write project files). They skip, rather than
-// fail, when no local CocoaPods/git install is available, since
-// Milestone 2 still depends on one per ADR 0002.
-//
-// Not yet covered here: an existing hand-authored Podfile.lock from a
-// different CocoaPods version/project. Tracked in ROADMAP.md, not
-// silently assumed to work.
+// Doesn't yet cover importing someone else's hand-written
+// Podfile.lock; see ROADMAP.md.
 package compatibility
 
 import (

@@ -2,124 +2,85 @@
 
 Status key: ✅ done · 🚧 in progress · ⬜ not started
 
-## Milestone 0 — Architecture *(this milestone)*
-- ✅ Research CocoaPods internals (CLI, CocoaPods-Core, Molinillo, cocoapods-downloader, xcodeproj, Trunk, CDN, Podfile.lock format)
-- ✅ Select CLI language ([ADR 0001](docs/adr/0001-cli-language-go.md))
-- ✅ Define CLI-to-engine interface ([ADR 0002](docs/adr/0002-cocoapods-delegation-strategy.md))
-- ✅ Define registry architecture ([ADR 0003](docs/adr/0003-registry-federation-and-storage.md))
-- ✅ Architecture document with component diagram, trade-offs, risks ([ARCHITECTURE.md](ARCHITECTURE.md))
-- ✅ **Architecture approved**
+## Milestone 0 — Architecture ✅
+Researched CocoaPods' internals (CLI, CocoaPods-Core, Molinillo, cocoapods-downloader, xcodeproj, Trunk, CDN, Podfile.lock format), chose Go for the CLI ([ADR 0001](docs/adr/0001-cli-language-go.md)), and settled the delegation ([ADR 0002](docs/adr/0002-cocoapods-delegation-strategy.md)) and registry ([ADR 0003](docs/adr/0003-registry-federation-and-storage.md)) strategies. Architecture approved in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Milestone 1 — CLI skeleton ✅
-`zorvok --version`, `--help`, `doctor`, `config`, `init`. At the time, no CocoaPods interaction yet — `install`/`update`/`search`/`info`/`lib lint`/`login`/`trunk push`/`registry *` all existed as named, documented, explicitly "not implemented yet" commands rather than failing as unknown or silently no-op'ing (all are implemented now — see later milestones). Built in Go (module `github.com/zorvok-dev/zorvok-ios` — chosen as a placeholder at the time, later confirmed to match a real `zorvok-dev` GitHub org; see "Publishing this repository" below), stdlib-only, unit tested.
+`zorvok --version`, `--help`, `doctor`, `config`, `init`. Everything else started as a named, documented "not implemented yet" command rather than an unknown one — all of it is implemented now (see below). Go, stdlib-only, unit tested. The module path `github.com/zorvok-dev/zorvok-ios` was a placeholder that turned out to match a real GitHub org.
 
 ## Milestone 2 — CocoaPods compatibility 🚧
-`zorvok install`, `zorvok update`, `zorvok lib lint` are implemented, delegating to real `pod install`/`pod update`/`pod lib lint` (ADR 0002, Phase 1) via `engines/cocoapods/{adapter,installer,podspec}`. A compatibility test (`engines/cocoapods/compatibility`) runs a real, unmodified `pod install` end-to-end — against actual CocoaPods, not a mock — confirming the Podfile is never touched, `Podfile.lock` gets the expected sections, and `Pods/`/`.xcworkspace` are produced.
+`zorvok install`, `zorvok update`, and `zorvok lib lint` delegate to real `pod install`/`pod update`/`pod lib lint` (ADR 0002). Compatibility tests run real, unmodified CocoaPods end to end — no mocks, hermetic fixtures (local-path and `file://` git repos, no network, no Xcode.app).
 
-**Compatibility fixture coverage** (all run against real, installed CocoaPods — no mocking — and all hermetic: local-path and file:// git repos generated at test time, no network access, no real Xcode.app build, only the `xcodeproj` gem):
-
-| Surface (brief §10) | Fixture | Status |
+| Surface | Fixture | Status |
 |---|---|---|
-| Simple Podfile | `tests/fixtures/local-pod` + `simple-project` | ✅ |
-| Multiple dependencies | `tests/fixtures/transitive` (positive case) | ✅ |
-| Transitive dependencies | `tests/fixtures/transitive` — both the positive case and a negative case proving an undeclared local dependency fails resolution rather than being silently skipped | ✅ |
-| Subspecs | `tests/fixtures/subspecs` — verifies the undeclared subspec's files never reach the generated Pods project | ✅ |
-| Git dependencies | `tests/fixtures/git-dependency` — repo generated and tagged at test time, installed via `file://` | ✅ |
-| Resource bundles | `tests/fixtures/resource-bundle` — verifies a real `com.apple.product-type.bundle` target is generated | ✅ |
-| Multiple Xcode targets | `tests/fixtures/multi-target` — verifies per-target `Pods-<Target>` integration | ✅ |
-| Existing `Podfile.lock` (no drift on reinstall) | reuses `simple-project` | ✅ (`TestReinstallIsIdempotent`) |
-| Local path dependencies | covered by every fixture above | ✅ |
-| Binary frameworks / XCFrameworks | `tests/fixtures/xcframework` — a real `.xcframework` built with `clang` + `xcodebuild -create-xcframework` (no full Xcode project needed); verifies the host app target gets wired to `PODS_XCFRAMEWORKS_BUILD_DIR` | ✅ |
-| `zorvok update` actually updates (vs. `install` staying locked) | `tests/fixtures/updatable-pod` + `updatable-project` — a branch-tracking git dependency; confirmed empirically first that real `pod install` never re-resolves it but `pod update` does, then built `TestUpdateMovesForwardButInstallStaysLocked` to prove `zorvok` matches: install stays locked, update moves to the new commit/version | ✅ |
-| An existing hand-authored `Podfile.lock` from a *different* CocoaPods version/project | — | ⬜ not yet built |
+| Simple Podfile | `local-pod` + `simple-project` | ✅ |
+| Multiple / transitive dependencies | `transitive` (positive and negative case) | ✅ |
+| Subspecs | `subspecs` | ✅ |
+| Git dependencies | `git-dependency` | ✅ |
+| Resource bundles | `resource-bundle` | ✅ |
+| Multiple Xcode targets | `multi-target` | ✅ |
+| Reinstall is idempotent | `simple-project` | ✅ |
+| Local path dependencies | every fixture above | ✅ |
+| XCFrameworks | `xcframework`, built with `clang` + `xcodebuild -create-xcframework` | ✅ |
+| `update` moves forward, `install` stays locked | `updatable-pod` + `updatable-project` | ✅ |
+| Importing a hand-authored `Podfile.lock` from elsewhere | — | ⬜ not yet built |
 
-`engines/cocoapods/podfile`/`podspec` parsing (via `pod ipc`) for federation use is deferred to Milestone 5, since Phase 1 delegation doesn't need it yet.
+Podfile/podspec parsing for federation (via `pod ipc`) was deferred to Milestone 6, where it's actually needed.
 
 ## Milestone 3 — Public registry 🚧
-`registry-server` implements a versioned HTTP API (`registry-server/api`), package/version metadata with ownership and immutability (`registry-server/packages`), and Trunk-style email-verified session auth (`registry-server/auth`). `cmd/zorvok-registry` runs it; verified end-to-end both via `go test ./registry-server/...` (httptest) and a real running server exercised with `curl` (register → verify → publish → get → duplicate-rejected). CLI wiring landed later, across Milestones 4 (`login`/`trunk push`) and this increment (`search`/`info`, via `internal/registry.Client.Search`) — all four talk to the same registry API.
+The registry server exposes a versioned HTTP API: package/version metadata with ownership and immutability, Trunk-style email-verified sessions. `search`/`info` and `login`/`trunk push` all talk to it.
 
-What's covered, with real tests, not just described:
-- **Ownership / package-takeover protection** (brief §9): first publisher of a name owns it; a different account publishing to that name is rejected (403) — `TestPublishRejectsNonOwner`.
-- **Immutability** (brief §9, ADR 0003): republishing an existing `(package, version)` is rejected (409), even with different content — `TestPublishRejectsDuplicateImmutably`.
-- **Auth gating**: publishing requires a verified session; an unverified account is rejected (403) even with a valid token — `TestPublishRejectsUnverifiedAccount`.
-- **No server-side code execution** (brief §9): a submitted podspec is validated structurally (must be JSON, `name`/`version` must match the request) and stored verbatim — never parsed as Ruby or executed.
-- **Rate limiting** (brief §9): a minimal per-IP fixed-window limiter, tested.
+What's tested, not just built: ownership (a non-owner publishing to someone else's name is rejected, 403), immutability (republishing a version is rejected, 409, even with identical content), auth gating (publishing requires a verified session), no server-side code execution (a podspec is validated structurally and stored as submitted, never parsed as Ruby), and a per-IP rate limiter.
 
-**Not yet done, and explicitly not assumed**:
-- **PostgreSQL backend** — ADR 0003 calls for it; `registry-server/storage/postgres/schema.sql` documents the intended schema (with the DB-level `UNIQUE(package_name, version)` constraint ARCHITECTURE.md §2.4 calls for), but there's no `database/sql` implementation yet, and the schema itself is untested against a real database — this session's Docker daemon wasn't running. Only the in-memory store is implemented and used by `cmd/zorvok-registry` today; **all registry data is lost on restart**. See `registry-server/storage/README.md`.
-- **Real email delivery** — `auth.LogSender` logs verification links instead of sending them; a real provider is a drop-in `auth.EmailSender` implementation later, not a design change.
-- **Object storage / CDN for artifacts** — not needed yet; Milestone 3 is reference-only hosting (a podspec's `source` is a `:git`/`:http` URL, per ADR 0003's MVP scope).
-- **Ownership-precedence adversarial review** (ARCHITECTURE.md §5.4) — still required before Milestone 5 (federation) ships; Milestone 3's ownership model (first-publisher-wins) is necessary but not sufficient for that review.
+Known gaps: no PostgreSQL backend yet — the schema is designed per ADR 0003, but only the in-memory store is wired up, so registry data doesn't survive a restart. No real email transport; verification links are logged, not sent. No artifact storage — a podspec's `source` is a reference URL, which is the intended scope, not a shortcut.
 
 ## Milestone 4 — Publishing ✅
-`zorvok login <email>` and `zorvok trunk push [podspec] [--allow-warnings] [--skip-lint]` are implemented and wired to a real registry. Verified both ways: `go test ./internal/publisher/...` runs the full flow (real `pod lib lint` + real `pod ipc spec` + a real httptest registry server) including negative cases, and I also drove it manually against a real running `cmd/zorvok-registry` with the actual `zorvok` binary — register → verify → `trunk push` → published → re-push correctly rejected with 409.
+`zorvok login` and `zorvok trunk push` are wired to a real registry — tested against a real httptest server and, separately, by hand against a running `zorvok-registry` process with the compiled binary: register, verify, push, published, a re-push correctly rejected.
 
-What's covered, with real tests, not just described:
-- **`internal/registry`**: a Go HTTP client for the registry API, tested against a real server (not a mock) — register, publish, get, and each error path (404/403/409) as a typed `*registry.APIError`.
-- **`internal/publisher`**: locates the single `*.podspec` in the current directory (explicit error if zero or more than one — never guesses), lints it with real `pod lib lint` before publishing anything, converts it to JSON with real `pod ipc spec`, and **rejects client-side** a podspec whose `source` is a local `:path` (useless to publish — nobody else could install it) before any network call. `TestPushFailsLintBeforePublishing` confirms a podspec that fails lint never reaches the registry at all.
-- **`zorvok login`**: stores the session token via `internal/auth`'s per-registry-host credential store (built in Milestone 1), keyed by the configured `registry_url`.
-- **Config**: `registry_url` (project-over-global, like every other `zorvok config` key) defaults to `http://localhost:8080` — the local dev server's own default — since there's no public Zorvok registry yet; never a hardcoded production URL.
+`internal/registry` is an HTTP client tested against a real server, not a mock. `internal/publisher` finds the one podspec in the current directory (an explicit error on zero or more than one), lints it for real before publishing, and refuses to publish a podspec whose source is a local path, since nobody else could install from it. Sessions are stored per registry host; `registry_url` defaults to a local dev server, never a hardcoded production URL.
 
-**Not yet done**: no real email transport (same gap as Milestone 3 — `zorvok login` prints the same guidance about checking the dev server's log), and `zorvok trunk push` talks to exactly one registry (no federation — that's Milestone 5).
+Not yet done: no real email transport (same gap as Milestone 3), and publishing only ever reaches one registry — no federation yet.
 
-## Milestone 5 — Registry federation (re-scoped) ⚠️
-**Re-scoped mid-milestone by [ADR 0004](docs/adr/0004-federation-requires-podfile-source-line.md).** The original plan — `zorvok install` automatically resolving from both registries using the precedence rules in ADR 0003, with zero Podfile awareness of Zorvok — turned out not to be achievable while still delegating to `pod install` (ADR 0002, Phase 1-2). This was discovered by testing the actual mechanism before building on it, not assumed: `pod install` has no flag to inject an extra source, and a spec repo registered globally via `pod repo add` is not implicitly searched — confirmed with CocoaPods' own error message, *"not added the source repo that hosts the Podspec to your Podfile."* A source must be declared in the Podfile itself; there is no invisible way to add one for a single run.
+## Milestone 5 — Registry federation, re-scoped 🚧
+The original plan was automatic federation with zero Podfile awareness. That turned out not to be possible while still delegating to `pod install`: it has no flag to add a source for a single run, and a globally registered spec repo isn't implicitly searched unless the Podfile names it — confirmed against real CocoaPods' own error message, not assumed ([ADR 0004](docs/adr/0004-federation-requires-podfile-source-line.md)). A source has to be declared somewhere.
 
-**What Milestone 5 delivers instead**: using the Zorvok registry is opt-in, via the same one-line `source 'https://...'` a developer would add for any CocoaPods private registry — not a Zorvok-specific migration step. Remaining scope:
-- ⬜ Document the opt-in `source` line workflow (install guide / website docs, Milestone 6).
-- ✅ `zorvok registry list` / `add` / `add-cdn` / `remove` / `update` — thin wrappers around `pod repo list`/`add`/`add-cdn`/`remove`/`update` (`engines/cocoapods/repo`), stub-tested and verified for real against this machine's actual CocoaPods repos (`add-cdn` → appears in `list` → `remove` → gone). `add-cdn` specifically is the correct command for registering a Zorvok registry as a named source, since it speaks the CDN protocol (ADR 0006), not the git-clone one `add` uses.
-- ⬜ `zorvok doctor` check for whether the configured Zorvok registry is present as a Podfile `source` line, to catch the easy "forgot to add the source" mistake with a clear message.
+What shipped instead: using a Zorvok registry is exactly as opt-in as using any other private CocoaPods source — a `source 'https://...'` line. `zorvok registry list/add/add-cdn/remove/update` wrap `pod repo` for managing those sources, verified against this machine's real CocoaPods repos. True zero-Podfile-touch federation moved to Milestone 6, where it turned out to be achievable after all.
 
-**True automatic, zero-Podfile-touch federation — the original Milestone 5 goal — moves to Milestone 6**, where it's actually achievable: once Zorvok's own resolver controls the source list programmatically, the precedence rules in ADR 0003/ARCHITECTURE.md §2.3 apply for real, and the dependency-confusion adversarial review happens before *that* ships.
+Still open:
+- ⬜ A `zorvok doctor` check that flags when a configured registry isn't actually present as a Podfile `source` line.
+- ⬜ Written docs for this opt-in workflow, beyond what's here and in the README.
 
-## Milestone 6 — Independent installation engine 🚧
-Phase 3 of ADR 0002, first increment done: **[ADR 0005](docs/adr/0005-native-installer-and-federation-mechanism.md)**. `zorvok install --native [--source <url> ...]` drives `Pod::Installer` directly (the same class `pod install` itself uses — Molinillo still resolves, `xcodeproj` still generates the project, nothing reimplemented), supplying an in-memory-augmented Podfile instead of letting CocoaPods read the file a second time. This is the resolution to ADR 0004's blocker: a federated source is injected without ever writing to the Podfile on disk.
+## Milestone 6 — Native installation engine 🚧
+`zorvok install --native` drives `Pod::Installer` directly — the same class `pod install` itself uses, so Molinillo still resolves and `xcodeproj` still generates the project. It supplies an in-memory, augmented Podfile instead of letting CocoaPods reread the file, which is what lets a federated source get injected without the Podfile on disk ever being touched ([ADR 0005](docs/adr/0005-native-installer-and-federation-mechanism.md)).
 
-Verified, not just described:
-- `TestInstallNativeMatchesDelegatedInstall`: with no `--source`, the native path produces a **byte-identical** `Podfile.lock` to the delegated path — the differential-testing requirement ADR 0002 sets as the bar before this can ever become default.
-- `TestInstallNativeFederatesUndeclaredDependency`: a pod named nowhere in the Podfile, sourced from nowhere the Podfile names, resolves via an injected `--source` — and the Podfile's bytes on disk are confirmed unchanged before/after.
-- Both run fully isolated (`CP_HOME_DIR` pointed at a temp dir — a CocoaPods-native override, not a Zorvok one) with no network access and no shared state with a real machine's `~/.cocoapods`; the same flow was also run by hand through the compiled `zorvok` binary against this machine's real CocoaPods install.
-- `engines/cocoapods/adapter`'s Ruby-environment resolution (finding the right `ruby` interpreter + `GEM_HOME` from wherever `pod` itself is installed — Homebrew's isolated-Cellar shape and a plain `gem install cocoapods` shape are both handled, unit tested with synthetic fixtures) is its own small, necessary piece of portability work this needed.
+Four pieces, each tested against real CocoaPods:
+- **The installer itself.** With no `--source`, it produces a byte-identical `Podfile.lock` to the delegated path — the bar ADR 0002 sets before this can ever become default. With `--source`, it resolves a pod declared nowhere in the Podfile, and the Podfile's bytes are unchanged before and after.
+- **A CDN facade** ([ADR 0006](docs/adr/0006-cdn-facade.md)) so a live Zorvok registry can be used as a real CocoaPods CDN source, not just a local fixture — confirmed end to end: a running registry, a real `trunk push`, and `zorvok install --native --source` installing the published pod.
+- **Two bugs found while building the above, fixed before continuing** ([ADR 0007](docs/adr/0007-federation-safety-fixes.md)): injecting a federated source silently dropped the Podfile's implicit default CDN, breaking every pod with no explicit source of its own; and two sources offering the same pod/version resolve by declaration order with only a warning in real CocoaPods, not a hard failure. Both are fixed — the second is now a hard refusal.
+- **Automatic federation** ([ADR 0008](docs/adr/0008-automatic-federation.md)). With no `--source` flags, `--native` adds the configured `registry_url` automatically, but only when a user actually configured one; `--no-registry` opts out per run. The ADR 0007 hard-refuse is what makes this safe to automate.
 
-**Second increment done: [ADR 0006](docs/adr/0006-cdn-facade.md)** — `registry-server/cdn` serves the real CocoaPods CDN source protocol (read directly from the `cocoapods`/`cocoapods-core` gem source before writing any code, same discipline as ADR 0004/0005) in front of `registry-server/packages`, mounted at `/cdn/` on `cmd/zorvok-registry`. This closes the gap the first increment left open: `zorvok install --native --source <zorvok-registry-url>/cdn/` now works against a **real, running Zorvok registry**, not just a hand-built local Specs repo fixture.
-
-Verified with a full real-stack proof, not just Go tests: started a real `cmd/zorvok-registry`, published a real podspec to it via the real `zorvok trunk push` (pointed at a real, separately-hosted git repo as the pod's actual source — a full install really does fetch `:source`, unlike `lib lint`), then ran the compiled `zorvok` binary's `install --native --source http://localhost:8099/cdn/` against a Podfile that names the pod by name and version only. CocoaPods' own log confirmed it recognized the registry as a real CDN source (`Adding spec repo ... with CDN ...`), resolved and installed the pod, and `Podfile.lock` recorded `SPEC REPOS: http://localhost:8099/cdn/: - CDNFedPod` — provenance tracking for free. The Podfile on disk was confirmed byte-unchanged. `registry-server/cdn` also has its own httptest coverage per endpoint, including the two negative cases that matter (a request shape CDNSource would never construct, and a pod not on this registry — both 404 cleanly, the second being exactly ADR 0003's federation fallthrough case).
-
-**Third increment: [ADR 0007](docs/adr/0007-federation-safety-fixes.md)** — two bugs found in ADR 0005/0006 while investigating what "automatic federation" would require, fixed before continuing. One functional (injecting a federated source silently dropped the implicit default CDN, breaking every ordinary pod in a Podfile with no `source` lines of its own — every prior test only ever exercised a Podfile with one, fully-federated pod, so this went uncaught until a mixed-pod scenario was deliberately tested). One security (confirmed by reproducing it against real CocoaPods: two sources with the same pod+version resolve by *declaration order* with only a warning, exit code 0 — not a hard failure, and exploitable the instant Zorvok's injected source and any other source both have the same pod name). Both fixed and covered by dedicated tests: `TestInstallNativePreservesImplicitDefaultSource`, `TestInstallNativeAbortsOnAmbiguousSource`, `TestInstallNativePinnedSourceBypassesAmbiguityCheck`.
-
-**Fourth increment: [ADR 0008](docs/adr/0008-automatic-federation.md) — automatic federation, with the adversarial review done first.** `zorvok install --native` with no `--source` flags now automatically adds the configured `registry_url` as a source — but *only* when a user has actually run `zorvok config set registry_url ...` (never the bundled `http://localhost:8080` fallback nobody configured). `--no-registry` opts back out per invocation. The review itself worked through concrete attack scenarios before anything was built: a name-collision attack is already covered by ADR 0007's hard-refuse; a no-collision attack (an unclaimed name resolving silently) is real but not novel to federation — it's the same exposure any single open registry already has, mitigated at the registry's ownership/moderation layer, not the installer; and ADR 0003's original "Zorvok-owned names always win ties" rule is formally superseded by ADR 0007's stricter hard-refuse-on-ambiguity, which remains the permanent policy, not an interim one. Verified with a full real-stack proof: a real `cmd/zorvok-registry`, `registry_url` configured via `zorvok config set --global`, a real `trunk push`, then `zorvok install --native` with **zero flags** — it automatically added both the Zorvok registry and (since the Podfile had no source lines) the real `cdn.cocoapods.org`, resolved the published pod, and left the Podfile byte-unchanged. `--no-registry` was verified to correctly skip the registry and fail resolution as expected.
-
-**Still open, explicitly**:
-- `--native` is opt-in, not default (ADR 0002's own requirement) — `zorvok install` without `--native` is unchanged, still the Milestone 2 delegated path.
-- ADR 0003's ownership-based precedence ("a Zorvok-owned name always wins") is explicitly **not** implemented and, per ADR 0008, never will be in that form — hard-refuse-on-ambiguity replaces it as the permanent safety policy. Provenance beyond what CocoaPods' own `SPEC REPOS` section already gives for free isn't implemented either.
-- The registry itself still has no reserved-name policy or publisher-reputation system beyond "verified email, first publisher wins" (M3) — accepted, pre-existing, registry-moderation-layer risk per ADR 0008's review, not something the installer can or should fix.
-- `registry-server/cdn` computes its responses on the fly from the in-memory store on every request, not from precomputed static index files the way ARCHITECTURE.md §2.4 originally envisioned (modeled on `cdn.cocoapods.org`'s own read-heavy optimization) — fine at today's scale, revisit once there's a real backend and real traffic.
-- `pod repo update` against a Zorvok CDN source and deprecated-pod signaling (`deprecated_podspecs.txt`) aren't implemented.
-- `pod lib lint`/`pod ipc spec` (used by `zorvok lib lint`/`trunk push`) still delegate to the `pod` CLI binary, unchanged — only `install` has a native path so far.
+Still open: `--native` stays opt-in, not default. The registry has no reserved-name or publisher-reputation system beyond first-publisher-wins — a known, accepted gap at the registry's moderation layer, not something the installer can fix. The CDN facade computes responses from the in-memory store on every request rather than precomputed index files; fine at this scale, worth revisiting with real traffic. `pod repo update` against a Zorvok CDN source and deprecated-pod signaling aren't implemented. `lib lint`/`trunk push` still delegate to `pod` directly — only `install` has a native path.
 
 ## Milestone 7 — Public launch 🚧
-CLI + Homebrew tap + website + documentation + public registry, all versioned and backward-compatible per the engineering rules below.
+CLI, Homebrew tap, documentation, and public registry — versioned and backward-compatible.
 
-**Command parity with CocoaPods: ✅ done.** Every command `pod --help` lists has a Zorvok equivalent: the registry-native `trunk register`/`me`/`push`/`add-owner`/`remove-owner`/`deprecate`/`info` (`trunk delete` deliberately refuses and points at `deprecate` — published versions are immutable by design, ADR 0003), plus generic delegation (`internal/cli/delegate.go`) for every remaining pass-through command — `spec`, `cache`, `ipc`, `plugins`, `list`, `outdated`, `try`, `env`, `setup`, `deintegrate`, `lib create`, `registry lint`/`push`. See the README's command reference table for the full list. Verified both with stub-`pod` argv-forwarding tests and, for several, against real local state (`env`'s real stack info, `cache list`/`plugins installed`'s real local data, `ipc podfile-json` converting a real Podfile).
+**Command parity with CocoaPods: done.** Every command in `pod --help` has a Zorvok equivalent — the registry-native `trunk` family (`register`/`me`/`push`/`add-owner`/`remove-owner`/`deprecate`/`info`; `delete` refuses and points at `deprecate`, since published versions are immutable by design), plus generic delegation for every pass-through command (`spec`, `cache`, `ipc`, `plugins`, `list`, `outdated`, `try`, `env`, `setup`, `deintegrate`, `lib create`, `registry lint`/`push`). See the README's command reference.
 
-**Homebrew tap: built and verified, not yet publishable.** `zorvok-dev/homebrew-tap` has a real formula (`Formula/zorvok.rb`) — tested by actually running `brew install`/`brew test`/`brew audit --strict`/`brew style` against it (pointed temporarily at a locally-built release tarball, since there was no GitHub release yet at the time), all passing. The tap repo itself has not been pushed to GitHub yet, and still can't go further until `zorvok-ios` has a real tagged release for the formula's `url`/`sha256` to resolve against — see that repo's own README for the exact commit to tag. (`zorvok-ios` itself, and `zorvok-specs`, are pushed and public — see "Publishing this repository" below; `go install github.com/zorvok-dev/zorvok-ios/cmd/zorvok@main` already works today, with no tag needed.)
+**Homebrew: built, not yet publishable.** The formula passes `brew install`/`test`/`audit --strict`/`style`. It can't resolve until `zorvok-ios` has a tagged release for its `url`/`sha256` to point at — see the tap repo's README for the release steps. In the meantime, `go install github.com/zorvok-dev/zorvok-ios/cmd/zorvok@main` already works.
 
 ## Milestone 9 — Three-tier registry split ✅
-**[ADR 0009](docs/adr/0009-three-tier-registry-model.md)**: the registry became three tiers instead of one server — CocoaPods' own, Zorvok's free static public registry, and a self-hostable server for private/enterprise use (Maven-style: public registry + self-hosted Nexus/Artifactory-equivalent). Concretely:
+The registry became three tiers instead of one server: CocoaPods' own, a free static public registry, and a self-hostable server — the Maven model, a public index plus an optional self-hosted Nexus/Artifactory equivalent ([ADR 0009](docs/adr/0009-three-tier-registry-model.md)).
 
-- **This repo** kept the CLI only — `registry-server/` and `cmd/zorvok-registry/` were removed.
-- **`zorvok-dev/zorvok-registry-ios`** (new, separate repo, own `go.mod`): everything that was `registry-server/` + `cmd/zorvok-registry/`, unchanged architecture, builds and tests green standalone.
-- **`zorvok-dev/zorvok-specs`** (new, separate repo): a static public registry — the exact same CDN protocol `zorvok-registry/cdn` serves live, as pre-committed files instead. Ownership/immutability, normally a database's job, are enforced by a GitHub Actions PR check (`scripts/validate-pr.sh`) instead — tested locally against real git repos and real attack scenarios (ownership hijack attempt, immutability violation, name/version mismatch, invalid JSON) before being wired into the workflow YAML, though the YAML itself hasn't run against real GitHub Actions yet (no Actions access available).
-- This repo's own integration tests (`internal/registry`, `internal/publisher`) switched from importing `registry-server`'s Go packages directly (no longer possible — separate repo) to running a real `zorvok-registry` binary as a subprocess (`internal/registrytest`), the same pattern already used for testing against real `pod`/`git`.
+- This repo kept the CLI only; the registry server moved to its own repo (`zorvok-registry-ios`), same architecture, own `go.mod`.
+- `zorvok-specs` is a new, static public registry: the same CDN protocol the live server speaks, as pre-committed files. Ownership and immutability, normally a database's job, are enforced by a GitHub Actions PR check instead — tested locally against real attack scenarios (ownership hijack, immutability violation, name/version mismatch, malformed podspec) before being wired into the workflow.
+- This repo's integration tests now run a real `zorvok-registry` binary as a subprocess instead of importing its Go packages directly, since that's no longer possible across repos.
 
-**Verified, not just built**: ran a plain local static HTTP file server over the `specs` skeleton (standing in for GitHub Pages) and confirmed `zorvok install --native --source http://localhost:.../` correctly detected it as a real CocoaPods CDN source and installed a published pod from it — zero server-side code running. Along the way, an unplanned confirmation of ADR 0007's dependency-confusion guard: a test pod name happened to collide with a real, already-registered CocoaPods pod, and `zorvok install` correctly refused to resolve it rather than silently picking a source.
+Confirmed with a plain static file server standing in for GitHub Pages: `zorvok install --native --source` correctly detected it as a CDN source and installed from it, no server-side code involved. A test pod name happened to collide with a real public CocoaPods pod along the way — `zorvok install` correctly refused to resolve it rather than silently picking a source, an unplanned but useful confirmation of the ADR 0007 guard.
 
-**Not done**:
-- `zorvok trunk push` doesn't yet know how to publish to `zorvok-dev/zorvok-specs` (PR-based publishing only, for now) — only to a live `zorvok-registry-ios` server (Milestone 4).
-- The `zorvok-dev/zorvok-specs` GitHub Actions workflow YAML is unverified against real GitHub Actions — only the shell scripts it calls are tested. GitHub Pages is also not yet enabled for that repo (confirmed: its `github.io` URL 404s as of this writing) — `raw.githubusercontent.com` serves the same files today and is what the README documents in the meantime.
+Not done: `trunk push` still only publishes to a live registry server, not to `zorvok-specs` — PR-based publishing only, for now. The GitHub Actions workflow YAML hasn't run against real GitHub Actions yet; only the scripts it calls are tested locally. GitHub Pages isn't enabled for that repo yet either, so `raw.githubusercontent.com` serves the same files in the meantime.
 
 ## Publishing this repository
-The Go module path chosen in Milestone 0 (`github.com/zorvok-dev/zorvok-ios`) was a placeholder at the time — it turned out to match a real GitHub organization (`zorvok-dev`). **Status: pushed.** `zorvok-ios` and `zorvok-specs` are pushed to GitHub and public; `zorvok-registry-ios` is pushed and kept **private** (it holds the registry's internal implementation, per the original split into "private internal logic" vs. "public specs"). `homebrew-tap` exists locally, built and verified, but has not been pushed yet — see Milestone 7 above.
+`zorvok-ios` and `zorvok-specs` are pushed to GitHub and public. `zorvok-registry-ios` is pushed and kept private, since it holds the registry's internal implementation. `homebrew-tap` exists locally, built and verified, but hasn't been pushed yet — see Milestone 7.
 
 ---
 
@@ -129,4 +90,4 @@ The Go module path chosen in Milestone 0 (`github.com/zorvok-dev/zorvok-ios`) wa
 - Never break an existing, unmodified CocoaPods project.
 - No large unvalidated code drops — each milestone ships behind its own acceptance criteria.
 - Automated tests required per milestone (see `tests/`).
-- Docs (`ARCHITECTURE.md`, ADRs, this roadmap, `CHANGELOG.md`) kept current as decisions change.
+- Docs (`ARCHITECTURE.md`, ADRs, this roadmap) kept current as decisions change.

@@ -1,7 +1,5 @@
-// Package adapter is the sole boundary between Zorvok's Go code and the
-// CocoaPods Ruby toolchain. Per ADR 0002, Milestone 2 delegates
-// installation, resolution, and Xcode integration entirely to the real
-// `pod` executable; nothing outside this package shells out to it.
+// Package adapter is the only code that shells out to the CocoaPods
+// Ruby toolchain. Nothing else in this project talks to `pod` directly.
 package adapter
 
 import (

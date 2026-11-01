@@ -1,11 +1,5 @@
-// Package auth manages Zorvok's local credential storage.
-//
-// This is a Milestone 1 foundation only: it defines how a session token
-// is stored and loaded on disk. It intentionally does not implement
-// `zorvok login` itself (no registry API exists yet to authenticate
-// against) nor Trunk-style email verification — those land with the
-// registry and publishing milestones (M3-M4). The storage format mirrors
-// CocoaPods Trunk's model: a per-machine session token, no password.
+// Package auth stores Zorvok's local session tokens on disk — one per
+// registry host, no password, mirroring CocoaPods Trunk's model.
 package auth
 
 import (

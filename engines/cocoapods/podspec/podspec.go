@@ -1,8 +1,6 @@
-// Package podspec implements `zorvok lib lint` for Milestone 2 by
-// delegating to `pod lib lint`, the real podspec validator (syntax,
-// required metadata, platform/deployment-target checks, and a trial
-// build). Per ARCHITECTURE.md §2.4, podspec lint stays entirely
-// client-side; the registry server never executes package code.
+// Package podspec implements `zorvok lib lint` by delegating to `pod
+// lib lint` — the real validator, including a trial build. Linting is
+// always client-side; the registry never executes package code.
 package podspec
 
 import (

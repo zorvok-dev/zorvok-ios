@@ -1,9 +1,6 @@
-// Package publisher orchestrates `zorvok trunk push`: locate a podspec,
-// lint it locally (client-side only — the registry server never
-// executes package code, ARCHITECTURE.md §2.4), convert it to the
-// declarative JSON form via `pod ipc spec`, and publish that to a
-// Zorvok registry. Mirrors the real `pod trunk push` workflow's shape
-// (brief §6) without reusing CocoaPods Trunk's implementation.
+// Package publisher drives `zorvok trunk push`: find the podspec, lint
+// it locally, convert it to JSON via `pod ipc spec`, and publish to the
+// configured registry.
 package publisher
 
 import (
