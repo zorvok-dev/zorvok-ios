@@ -10,47 +10,43 @@ import (
 	"github.com/zorvok-dev/zorvok-ios/internal/registry"
 )
 
-// runTrunkRegister implements `zorvok trunk register <email> [name]`, an
-// alias for `zorvok login` — CocoaPods accepts both `pod trunk register`
-// and the Zorvok-native `login` spelling for the same registration flow.
+// runTrunkRegister is `zorvok trunk register`, an alias for `zorvok login`.
 func runTrunkRegister(out, errOut io.Writer, args []string) int {
 	return runLogin(out, errOut, args)
 }
 
-// runTrunkInfo implements `zorvok trunk info <name>`, an alias for
-// `zorvok info` — matching `pod trunk info`.
+// runTrunkInfo is `zorvok trunk info`, an alias for `zorvok info`.
 func runTrunkInfo(out, errOut io.Writer, args []string) int {
 	return runInfo(out, errOut, args)
 }
 
 // loggedInClient resolves the configured registry and this machine's
 // stored session for it, the shared precondition for every
-// authenticated trunk command.
-func loggedInClient(errOut io.Writer) (client *registry.Client, url, token string, ok bool) {
-	url, err := registryURL()
+// authenticated trunk command. It reports failure through its error
+// return rather than writing to errOut itself, matching every other
+// helper in this package — the caller decides how to present it.
+func loggedInClient() (client *registry.Client, url, token string, err error) {
+	url, err = registryURL()
 	if err != nil {
-		exitErr(errOut, "%v", err)
-		return nil, "", "", false
+		return nil, "", "", err
 	}
 	store, err := zauth.LoadStore()
 	if err != nil {
-		exitErr(errOut, "%v", err)
-		return nil, "", "", false
+		return nil, "", "", err
 	}
 	creds, found := store.Get(url)
 	if !found {
-		exitErr(errOut, "not logged in to %s — run `zorvok login <email>` first", url)
-		return nil, "", "", false
+		return nil, "", "", fmt.Errorf("not logged in to %s — run `zorvok login <email>` first", url)
 	}
-	return registry.NewClient(url), url, creds.Token, true
+	return registry.NewClient(url), url, creds.Token, nil
 }
 
 // runTrunkMe implements `zorvok trunk me`, mirroring `pod trunk me`:
 // shows the account behind this machine's stored session.
 func runTrunkMe(out, errOut io.Writer, _ []string) int {
-	client, url, token, ok := loggedInClient(errOut)
-	if !ok {
-		return 1
+	client, url, token, err := loggedInClient()
+	if err != nil {
+		return exitErr(errOut, "%v", err)
 	}
 	account, err := client.Me(context.Background(), token)
 	if err != nil {
@@ -74,9 +70,9 @@ func runTrunkAddOwner(out, errOut io.Writer, args []string) int {
 	}
 	pod, owner := args[0], args[1]
 
-	client, _, token, ok := loggedInClient(errOut)
-	if !ok {
-		return 1
+	client, _, token, err := loggedInClient()
+	if err != nil {
+		return exitErr(errOut, "%v", err)
 	}
 	if err := client.AddOwner(context.Background(), token, pod, owner); err != nil {
 		return exitErr(errOut, "%v", err)
@@ -96,9 +92,9 @@ func runTrunkRemoveOwner(out, errOut io.Writer, args []string) int {
 	}
 	pod, owner := args[0], args[1]
 
-	client, _, token, ok := loggedInClient(errOut)
-	if !ok {
-		return 1
+	client, _, token, err := loggedInClient()
+	if err != nil {
+		return exitErr(errOut, "%v", err)
 	}
 	if err := client.RemoveOwner(context.Background(), token, pod, owner); err != nil {
 		return exitErr(errOut, "%v", err)
@@ -116,14 +112,16 @@ func runTrunkDeprecate(out, errOut io.Writer, args []string) int {
 	name := args[0]
 	message := ""
 	for _, a := range args[1:] {
-		if rest, ok := strings.CutPrefix(a, "--in-favor-of="); ok && rest != "" {
-			message = "use " + rest + " instead"
+		rest, ok := strings.CutPrefix(a, "--in-favor-of=")
+		if !ok || rest == "" {
+			return exitErr(errOut, "unrecognized argument %q — usage: zorvok trunk deprecate NAME [--in-favor-of=OTHER]", a)
 		}
+		message = "use " + rest + " instead"
 	}
 
-	client, _, token, ok := loggedInClient(errOut)
-	if !ok {
-		return 1
+	client, _, token, err := loggedInClient()
+	if err != nil {
+		return exitErr(errOut, "%v", err)
 	}
 	if err := client.Deprecate(context.Background(), token, name, message); err != nil {
 		return exitErr(errOut, "%v", err)
@@ -145,7 +143,7 @@ func runTrunkDelete(_ io.Writer, errOut io.Writer, args []string) int {
 	if len(args) != 2 {
 		return exitErr(errOut, "usage: zorvok trunk delete NAME VERSION")
 	}
-	fmt.Fprintf(errOut, "zorvok trunk delete: not supported — published versions are immutable (ADR 0003).\n")
+	fmt.Fprintf(errOut, "zorvok trunk delete: not supported — published versions are immutable.\n")
 	fmt.Fprintf(errOut, "Use `zorvok trunk deprecate %s` to warn consumers off a version instead.\n", args[0])
 	return 1
 }
