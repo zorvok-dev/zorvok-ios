@@ -186,3 +186,38 @@ func TestInstallNativeFederatesUndeclaredDependency(t *testing.T) {
 		t.Fatalf("Podfile.lock missing FederatedPod:\n%s", lock)
 	}
 }
+
+// TestInstallNativeEvaluatesPodfileExactlyOnce proves a Podfile's
+// top-level Ruby runs once per InstallNative call, the same as a real
+// `pod install` would. The shim used to parse the Podfile once just to
+// inspect its declared sources, then build an "augmented" Podfile by
+// prepending synthetic `source` lines to the same file contents and
+// parsing that too — silently running any side-effecting top-level
+// code in the file (a `puts`, a shell-out, a hook registered as a
+// require's side effect) a second time.
+func TestInstallNativeEvaluatesPodfileExactlyOnce(t *testing.T) {
+	requirePod(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
+
+	root := t.TempDir()
+	copyRel(t, root, "local-pod")
+	copyRel(t, root, "eval-once-project")
+	projectDir := filepath.Join(root, "eval-once-project")
+
+	marker := filepath.Join(root, "eval-marker")
+	t.Setenv("ZORVOK_EVAL_MARKER", marker)
+
+	var out, errOut strings.Builder
+	if err := InstallNative(&out, &errOut, projectDir, nil); err != nil {
+		t.Fatalf("InstallNative: %v\nstdout:\n%s\nstderr:\n%s", err, out.String(), errOut.String())
+	}
+
+	data, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatalf("marker file was never written: %v", err)
+	}
+	lines := strings.Count(string(data), "\n")
+	if lines != 1 {
+		t.Fatalf("Podfile's top-level code ran %d time(s), want exactly 1 (marker contents: %q)", lines, data)
+	}
+}

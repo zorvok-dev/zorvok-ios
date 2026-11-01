@@ -37,11 +37,12 @@
 #    If the original Podfile already declared its own sources, Zorvok
 #    adds nothing extra beyond what was asked for via --source.
 #
-# 2. Confirmed empirically: when two sources both have a spec for the
-#    same (pod, version), CocoaPods' own Specification::Set picks one by
-#    *source declaration order* — printing a warning ("Found multiple
-#    specifications for ...") but still exiting 0. That is not "never a
-#    silent pick" (ADR 0003); it is a real, exploitable dependency-
+# 2. When two sources both have a spec for the same (pod, version),
+#    CocoaPods' own Specification::Set picks one by *source declaration
+#    order* — printing a warning ("Found multiple specifications
+#    for ...") but still exiting 0, as a quick test against the real
+#    gem confirms. That is not "never a silent pick" (ADR 0003); it is
+#    a real, exploitable dependency-
 #    confusion / package-takeover vector the instant more than one
 #    source is in play, which federation inherently requires. Fix: a
 #    preflight check, using the exact same Pod::Installer::Analyzer#sources
@@ -62,33 +63,59 @@ require 'cocoapods'
 # instead of depending on real network access to cdn.cocoapods.org.
 TRUNK_CDN_URL = (ENV['ZORVOK_DEFAULT_SOURCE_URL'] || 'https://cdn.cocoapods.org/').freeze
 
+# The one place this script reports a failure and exits — every
+# expected failure below (bad arguments, no Podfile, the ambiguous-
+# source refusal) raises Pod::Informative rather than calling this
+# directly, so there is exactly one path from "something is wrong" to
+# "tell the user and exit 1," not one for preconditions and a second,
+# separate one in the rescue clause for whatever Pod::Installer itself
+# raises.
 def fail_with(message)
   warn "zorvok-native-install: #{message}"
   exit 1
 end
 
-project_dir = ARGV[0]
-fail_with('missing project directory argument') if project_dir.nil? || project_dir.empty?
-extra_sources = ARGV[1..]
-
-config = Pod::Config.instance
-config.installation_root = Pathname.new(project_dir)
-
-podfile_path = config.podfile_path
-fail_with("no Podfile found in #{project_dir}") unless podfile_path && podfile_path.exist?
-
 begin
+  project_dir = ARGV[0]
+  raise Pod::Informative, 'missing project directory argument' if project_dir.nil? || project_dir.empty?
+  extra_sources = ARGV[1..]
+
+  config = Pod::Config.instance
+  config.installation_root = Pathname.new(project_dir)
+
+  podfile_path = config.podfile_path
+  unless podfile_path && podfile_path.exist?
+    raise Pod::Informative, "no Podfile found in #{project_dir}"
+  end
+
   contents = File.read(podfile_path)
+
+  # Evaluate the user's real Podfile exactly once. The previous approach
+  # parsed it a first time just to inspect `sources`, then built a second
+  # Podfile by textually prepending `source` lines to the SAME contents
+  # and parsing that — which ran any side-effecting top-level Ruby in the
+  # Podfile (a `puts`, a shell-out, a `require` with import-time effects)
+  # a second time. Reusing the one parsed Podfile and injecting sources
+  # directly into its internal hash avoids that.
+  podfile = Pod::Podfile.from_ruby(podfile_path, contents)
 
   # Fix 1: preserve the implicit default CDN when the original Podfile
   # declared no sources of its own — see the file header.
-  original_podfile = Pod::Podfile.from_ruby(podfile_path, contents)
   source_lines = extra_sources.dup
-  source_lines << TRUNK_CDN_URL if original_podfile.sources.empty? && !extra_sources.empty?
+  source_lines << TRUNK_CDN_URL if podfile.sources.empty? && !extra_sources.empty?
 
-  augmented = source_lines.map { |url| "source #{url.inspect}\n" }.join + contents
-  augmented_podfile = Pod::Podfile.from_ruby(podfile_path, augmented)
-  config.podfile = augmented_podfile
+  # Prepend the federated sources ahead of whatever the Podfile itself
+  # declared, the same way the `source` DSL method
+  # (Pod::Podfile::DSL#source) stores them — by writing to the internal
+  # hash directly, not by re-evaluating Podfile text. set_hash_value is
+  # a private method (there's no public mutator for an already-built
+  # Podfile — the DSL is meant to be the only writer), so `send` is
+  # used deliberately, the same way this file already reaches past
+  # Podfile's public surface for Pod::Installer::Analyzer below.
+  unless source_lines.empty?
+    podfile.send(:set_hash_value, 'sources', (source_lines + podfile.sources).uniq)
+  end
+  config.podfile = podfile
 
   # Fix 2: refuse to silently disambiguate a pod that resolves from more
   # than one source. This has to check every pod the install actually
@@ -97,11 +124,11 @@ begin
   # transitively-pulled-in pods are in play, and those can never be
   # pinned to a source via the Podfile's `:source =>` syntax, so they're
   # exactly as exploitable as a root-level one.
-  if augmented_podfile.sources.size > 1
-    analyzer = Pod::Installer::Analyzer.new(config.sandbox, augmented_podfile, config.lockfile)
+  if podfile.sources.size > 1
+    analyzer = Pod::Installer::Analyzer.new(config.sandbox, podfile, config.lockfile)
     sources = analyzer.sources
 
-    pinned_names = augmented_podfile.dependencies.select(&:podspec_repo).map(&:root_name)
+    pinned_names = podfile.dependencies.select(&:podspec_repo).map(&:root_name)
     resolved_names = analyzer.analyze.specifications.map { |spec| spec.root.name }.uniq
 
     ambiguous = resolved_names.each_with_object({}) do |name, found|
@@ -115,11 +142,10 @@ begin
       details = ambiguous.map do |name, matches|
         "  #{name}: found in #{matches.map(&:url).join(', ')}"
       end.join("\n")
-      fail_with(
-        "refusing to install — the following pods resolve from more than one " \
-        "source and have no explicit `:source =>` pin in the Podfile:\n#{details}\n" \
-        'Pin each one explicitly (e.g. `pod "Name", :source => "https://..."`) to proceed.',
-      )
+      raise Pod::Informative,
+            "refusing to install — the following pods resolve from more than one " \
+            "source and have no explicit `:source =>` pin in the Podfile:\n#{details}\n" \
+            'Pin each one explicitly (e.g. `pod "Name", :source => "https://..."`) to proceed.'
     end
   end
 
