@@ -3,28 +3,12 @@ package adapter
 import (
 	"bytes"
 	"errors"
-	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
+
+	"github.com/zorvok-dev/zorvok-ios/internal/testutil"
 )
 
-// stubPod puts a fake `pod` shell script on PATH for the duration of the
-// test, so these tests exercise our subprocess/exit-code handling without
-// depending on a real CocoaPods install.
-func stubPod(t *testing.T, script string) {
-	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("shell-script stub not supported on windows")
-	}
-
-	dir := t.TempDir()
-	path := filepath.Join(dir, "pod")
-	if err := os.WriteFile(path, []byte("#!/bin/sh\n"+script+"\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-}
+var stubPod = testutil.StubPod
 
 func TestFindNotOnPath(t *testing.T) {
 	t.Setenv("PATH", t.TempDir()) // empty dir, guaranteed no `pod`
