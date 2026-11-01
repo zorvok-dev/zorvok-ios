@@ -86,7 +86,7 @@ begin
   source_lines = extra_sources.dup
   source_lines << TRUNK_CDN_URL if original_podfile.sources.empty? && !extra_sources.empty?
 
-  augmented = source_lines.map { |url| "source '#{url}'\n" }.join + contents
+  augmented = source_lines.map { |url| "source #{url.inspect}\n" }.join + contents
   augmented_podfile = Pod::Podfile.from_ruby(podfile_path, augmented)
   config.podfile = augmented_podfile
 
