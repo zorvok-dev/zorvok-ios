@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"regexp"
 	"sync"
@@ -60,10 +61,7 @@ func Start(t *testing.T) *Server {
 	srv := &Server{BaseURL: baseURL}
 
 	cmd := exec.Command("zorvok-registry")
-	cmd.Env = append(cmd.Env,
-		"ZORVOK_REGISTRY_ADDR=127.0.0.1:"+fmt.Sprint(port),
-		"ZORVOK_REGISTRY_BASE_URL="+baseURL,
-	)
+	cmd.Env = subprocessEnv("127.0.0.1:"+fmt.Sprint(port), baseURL)
 	cmd.Stdout = srv
 	cmd.Stderr = srv
 	if err := cmd.Start(); err != nil {
@@ -78,6 +76,21 @@ func Start(t *testing.T) *Server {
 		t.Fatalf("zorvok-registry did not become ready: %v\nlog:\n%s", err, srv.snapshot())
 	}
 	return srv
+}
+
+// subprocessEnv extends the test process's own environment rather
+// than replacing it. cmd.Env = append(cmd.Env, ...) on a freshly
+// constructed exec.Cmd starts from nil, so the previous code handed
+// the subprocess exactly ZORVOK_REGISTRY_ADDR and
+// ZORVOK_REGISTRY_BASE_URL and nothing else — no PATH, no HOME, no
+// TMPDIR. zorvok-registry doesn't need any of those today, but a
+// subprocess silently stripped of its environment is a trap for
+// whatever it needs tomorrow.
+func subprocessEnv(addr, baseURL string) []string {
+	return append(os.Environ(),
+		"ZORVOK_REGISTRY_ADDR="+addr,
+		"ZORVOK_REGISTRY_BASE_URL="+baseURL,
+	)
 }
 
 var verifyLinkRe = regexp.MustCompile(`verification email for (\S+): (\S+)`)

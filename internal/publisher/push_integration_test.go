@@ -23,9 +23,9 @@ func requirePod(t *testing.T) {
 	}
 }
 
-// newTestRegistry starts a real zorvok-registry subprocess (zorvok-dev/
-// zorvok-registry, zorvok ADR 0009 — the server's Go packages moved to
-// their own repo, so this can no longer import them directly).
+// newTestRegistry starts a real zorvok-registry subprocess
+// (zorvok-dev/zorvok-registry-ios — a separate repo, so this can't
+// import its Go packages directly).
 func newTestRegistry(t *testing.T) (*registry.Client, string) {
 	t.Helper()
 	srv := registrytest.Start(t)
@@ -78,10 +78,9 @@ func copyTree(t *testing.T, src, dst string) {
 	}
 }
 
-// TestPushPublishesToARealRunningRegistry is the Milestone 4 acceptance
-// test (ROADMAP.md: "Publish a real test podspec end-to-end"): lints a
-// real podspec with real `pod lib lint`, converts it with real `pod ipc
-// spec`, and publishes it to a real, running zorvok-registry subprocess
+// TestPushPublishesToARealRunningRegistry lints a real podspec with
+// real `pod lib lint`, converts it with real `pod ipc spec`, and
+// publishes it to a real, running zorvok-registry subprocess
 // (in-memory store) — not a mock.
 func TestPushPublishesToARealRunningRegistry(t *testing.T) {
 	requirePod(t)

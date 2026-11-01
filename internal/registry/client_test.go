@@ -3,15 +3,16 @@ package registry
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/zorvok-dev/zorvok-ios/internal/registrytest"
 )
 
-// newTestRegistry starts a real zorvok-registry subprocess (zorvok-dev/
-// zorvok-registry, zorvok ADR 0009) and returns a Client pointed at it —
-// these tests exercise the actual HTTP contract against the real
-// server binary, not a mock of it.
+// newTestRegistry starts a real zorvok-registry subprocess
+// (zorvok-dev/zorvok-registry-ios) and returns a Client pointed at
+// it — these tests exercise the actual HTTP contract against the
+// real server binary, not a mock of it.
 func newTestRegistry(t *testing.T) (*Client, *registrytest.Server) {
 	t.Helper()
 	srv := registrytest.Start(t)
@@ -215,6 +216,24 @@ func TestPackageNameWithURLMetacharactersReachesTheRightEndpoint(t *testing.T) {
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != 400 {
 		t.Fatalf("got %v, want *APIError with status 400 (invalid name, correctly routed) - a misrouted request would fail differently", err)
+	}
+}
+
+// TestInvalidBaseURLFailsWithAClearError proves a Client built around
+// an empty, scheme-less, or otherwise malformed base URL fails with a
+// message that names the actual problem, rather than a generic
+// net/url or net/http error several layers removed from "your
+// configured registry URL is wrong."
+func TestInvalidBaseURLFailsWithAClearError(t *testing.T) {
+	for _, baseURL := range []string{"", "example.com", "not a url with spaces and :: bad stuff"} {
+		c := NewClient(baseURL)
+		_, err := c.Me(context.Background(), "token")
+		if err == nil {
+			t.Fatalf("baseURL %q: expected an error, got none", baseURL)
+		}
+		if !strings.Contains(err.Error(), "invalid base URL") {
+			t.Fatalf("baseURL %q: got %q, want it to mention \"invalid base URL\"", baseURL, err.Error())
+		}
 	}
 }
 
