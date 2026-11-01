@@ -85,6 +85,12 @@ func Push(ctx context.Context, out, errOut io.Writer, dir string, client *regist
 		return nil, fmt.Errorf("%s is not a regular file", podspecPath)
 	}
 
+	// ctx isn't passed to podspec.Lint/podspec.JSON below — neither
+	// accepts one; they shell out via exec.Command, not
+	// exec.CommandContext. A `pod lib lint` or `pod ipc spec` that
+	// hangs can't be cancelled by ctx the way the PublishVersion call
+	// further down can. Fixing that belongs in engines/cocoapods
+	// alongside those functions, not here.
 	if !opts.SkipLint {
 		fmt.Fprintf(out, "-> Linting %s\n", podspecPath)
 		lintArgs := []string{podspecPath}
@@ -132,6 +138,11 @@ func parsePodspec(podspecJSON string) (name, version string, source map[string]a
 	return name, version, source, nil
 }
 
+// fetchableSourceKinds names the CocoaPods source types other
+// machines can actually fetch from, reused across
+// validateSourceIsFetchable's error messages below.
+const fetchableSourceKinds = "a :git, :http, :svn, or :hg source"
+
 // validateSourceIsFetchable rejects publishing a podspec whose `source`
 // is a bare local :path — nobody else could install it, so a registry
 // publish of it is always a mistake, not a real workflow. Real
@@ -139,7 +150,7 @@ func parsePodspec(podspecJSON string) (name, version string, source map[string]a
 // reach, matching CocoaPods' own source types.
 func validateSourceIsFetchable(source map[string]any) error {
 	if source == nil {
-		return fmt.Errorf("podspec has no `source` — add a :git, :http, :svn, or :hg source others can fetch from")
+		return fmt.Errorf("podspec has no `source` — add %s others can fetch from", fetchableSourceKinds)
 	}
 	for _, key := range []string{"git", "http", "svn", "hg"} {
 		if v, ok := source[key].(string); ok && strings.TrimSpace(v) != "" {
@@ -147,15 +158,17 @@ func validateSourceIsFetchable(source map[string]any) error {
 		}
 	}
 	if _, ok := source["path"]; ok {
-		return fmt.Errorf("podspec's source is a local :path — publish requires a :git, :http, :svn, or :hg source other users can fetch from")
+		return fmt.Errorf("podspec's source is a local :path — publish requires %s other users can fetch from", fetchableSourceKinds)
 	}
 	return fmt.Errorf("podspec's source has no recognized :git/:http/:svn/:hg key")
 }
 
+// sourceSummary re-encodes source, which always comes from
+// parsePodspec's own json.Unmarshal result — a tree of only the
+// types encoding/json produces for interface{} (map, slice, string,
+// float64, bool, nil), none of which json.Marshal can fail on. The
+// error is deliberately ignored, not swallowed by accident.
 func sourceSummary(source map[string]any) string {
-	b, err := json.Marshal(source)
-	if err != nil {
-		return ""
-	}
+	b, _ := json.Marshal(source)
 	return string(b)
 }

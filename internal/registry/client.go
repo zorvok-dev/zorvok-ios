@@ -170,6 +170,16 @@ func (c *Client) Deprecate(ctx context.Context, sessionToken, name, message stri
 }
 
 func (c *Client) do(ctx context.Context, method, path, sessionToken string, body, out any) error {
+	// NewClient takes BaseURL on faith — nothing stops a caller from
+	// constructing a Client around an empty or scheme-less string
+	// (e.g. a registry_url left unset in config). Left unchecked,
+	// that surfaces as a generic net/url parse error or "unsupported
+	// protocol scheme \"\"" from deep inside net/http, with nothing
+	// to tell the caller it's the registry URL at fault.
+	if parsed, err := url.Parse(c.BaseURL); err != nil || c.BaseURL == "" || parsed.Scheme == "" || parsed.Host == "" {
+		return fmt.Errorf("registry: invalid base URL %q (want something like \"https://registry.example.com\")", c.BaseURL)
+	}
+
 	var reader io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
