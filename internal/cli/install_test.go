@@ -2,6 +2,7 @@ package cli
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -62,5 +63,21 @@ func TestParseInstallArgsSourceMissingValue(t *testing.T) {
 	_, _, _, _, err := parseInstallArgs([]string{"--native", "--source"})
 	if err == nil {
 		t.Fatal("expected an error for --source with no URL")
+	}
+}
+
+// TestNativeInstallRejectsUnsupportedFlags exercises runInstall
+// itself, not just parseInstallArgs: --native's rest (any
+// pod-install-only flag like --repo-update or --verbose) must be
+// rejected with a clear error, not silently discarded. parseInstallArgs
+// correctly computes rest; this is what proves the caller actually
+// uses it before the native path ever runs.
+func TestNativeInstallRejectsUnsupportedFlags(t *testing.T) {
+	_, errOut, code := run("install", "--native", "--repo-update")
+	if code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
+	}
+	if !strings.Contains(errOut, "--repo-update") {
+		t.Fatalf("expected the error to name the unsupported flag, got %q", errOut)
 	}
 }

@@ -55,20 +55,21 @@ func TestUnknownCommand(t *testing.T) {
 
 // TestPlannedTwoWordCommandIsHonestNotSilent exercises the planned-
 // command mechanism itself — every real command now has an
-// implementation (plannedCommands is currently empty), so this injects
-// a temporary fake entry rather than relying on one actual command
-// staying unimplemented forever. Whatever the next genuinely planned
-// command turns out to be, this is the mechanism it will use.
+// implementation (plannedCommands is currently empty), so this passes
+// a local fake entry straight into execute (the package's actual
+// mutable state is never touched, so this is safe under `go test
+// -parallel`/`-race` even if sibling tests in this file run
+// concurrently). Whatever the next genuinely planned command turns
+// out to be, this is the mechanism it will use.
 func TestPlannedTwoWordCommandIsHonestNotSilent(t *testing.T) {
-	original := plannedCommands
-	plannedCommands = append([]plannedCommand{}, plannedCommand{"someday feature", "A hypothetical future command", "Milestone 99"})
-	t.Cleanup(func() { plannedCommands = original })
+	planned := []plannedCommand{{"someday feature", "A hypothetical future command", "Milestone 99"}}
 
-	_, errOut, code := run("someday", "feature")
+	var out, errOut bytes.Buffer
+	code := execute([]string{"someday", "feature"}, &out, &errOut, planned)
 	if code != 1 {
 		t.Fatalf("exit code = %d, want 1", code)
 	}
-	if !strings.Contains(errOut, "not implemented yet") {
-		t.Fatalf("expected an explicit not-implemented message, got %q", errOut)
+	if !strings.Contains(errOut.String(), "not implemented yet") {
+		t.Fatalf("expected an explicit not-implemented message, got %q", errOut.String())
 	}
 }
