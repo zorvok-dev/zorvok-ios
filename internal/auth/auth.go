@@ -22,6 +22,7 @@ type Credentials struct {
 // Store is a map of registry host -> Credentials, persisted as one file.
 type Store struct {
 	sessions map[string]Credentials
+	removed  map[string]bool // hosts explicitly removed since Load, applied by Save
 	path     string
 }
 
@@ -41,7 +42,7 @@ func LoadStore() (*Store, error) {
 		return nil, err
 	}
 
-	s := &Store{sessions: map[string]Credentials{}, path: path}
+	s := &Store{sessions: map[string]Credentials{}, removed: map[string]bool{}, path: path}
 
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -61,15 +62,62 @@ func LoadStore() (*Store, error) {
 	return s, nil
 }
 
-// Save persists the store to disk with owner-only permissions, since it
-// holds session tokens.
+// Save persists the store to disk with owner-only permissions, since
+// it holds session tokens.
+//
+// It merges this Store's changes (every Set/Remove since Load) onto
+// whatever the file currently holds, rather than overwriting the
+// whole file with this process's in-memory snapshot — two `zorvok
+// login` calls to different registries running close together must
+// not have one silently erase the other's just-written session, which
+// a blind overwrite would do (last Save wins, full stop). The write
+// itself is atomic: built in a temp file in the same directory, then
+// renamed into place, so a crash or kill mid-write can't truncate or
+// corrupt the one file every registry's session lives in.
 func (s *Store) Save() error {
-	data, err := yaml.Marshal(s.sessions)
+	if s.path == "" {
+		return fmt.Errorf("credential store has no associated path")
+	}
+
+	onDisk := map[string]Credentials{}
+	if data, err := os.ReadFile(s.path); err == nil {
+		// Best-effort: a concurrently-corrupted file just means
+		// nothing to merge, not a reason to fail this Save.
+		yaml.Unmarshal(data, &onDisk)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("read %s: %w", s.path, err)
+	}
+	for host, c := range s.sessions {
+		onDisk[host] = c
+	}
+	for host := range s.removed {
+		delete(onDisk, host)
+	}
+
+	data, err := yaml.Marshal(onDisk)
 	if err != nil {
 		return fmt.Errorf("encode credentials: %w", err)
 	}
-	if err := os.WriteFile(s.path, data, 0o600); err != nil {
-		return fmt.Errorf("write %s: %w", s.path, err)
+
+	tmp, err := os.CreateTemp(filepath.Dir(s.path), ".credentials-*.tmp")
+	if err != nil {
+		return fmt.Errorf("create temp file for %s: %w", s.path, err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath) // no-op once the rename below succeeds
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return fmt.Errorf("write %s: %w", tmpPath, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("write %s: %w", tmpPath, err)
+	}
+	if err := os.Chmod(tmpPath, 0o600); err != nil {
+		return fmt.Errorf("set permissions on %s: %w", tmpPath, err)
+	}
+	if err := os.Rename(tmpPath, s.path); err != nil {
+		return fmt.Errorf("replace %s: %w", s.path, err)
 	}
 	return nil
 }
@@ -83,11 +131,16 @@ func (s *Store) Get(host string) (Credentials, bool) {
 // Set stores credentials for host.
 func (s *Store) Set(host string, c Credentials) {
 	s.sessions[host] = c
+	delete(s.removed, host)
 }
 
 // Remove deletes stored credentials for host.
 func (s *Store) Remove(host string) {
 	delete(s.sessions, host)
+	if s.removed == nil {
+		s.removed = map[string]bool{}
+	}
+	s.removed[host] = true
 }
 
 // Hosts lists every host with stored credentials.
