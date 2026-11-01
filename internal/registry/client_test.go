@@ -195,6 +195,29 @@ func TestDeprecate(t *testing.T) {
 	}
 }
 
+// TestPackageNameWithURLMetacharactersReachesTheRightEndpoint proves a
+// package name is percent-encoded into the request path, not spliced
+// in raw. Before this was fixed, a name containing `?` truncated the
+// actual request path at the `?` (everything after it, including the
+// intended `/versions` suffix, became query-string garbage instead),
+// silently misrouting the request. A name like this is never valid
+// (packages.ValidateName rejects it), so the proof is in *how* it
+// fails: a clean 400 from the versions-publish route (meaning the
+// full path, name included, was correctly received and validated) —
+// not some other status shape that would indicate the request landed
+// on the wrong route entirely.
+func TestPackageNameWithURLMetacharactersReachesTheRightEndpoint(t *testing.T) {
+	client, srv := newTestRegistry(t)
+	ctx := context.Background()
+	token := registerAndVerify(t, client, srv, "dev@example.com")
+
+	_, err := client.PublishVersion(ctx, token, "Foo?x=1", "1.0.0", `{"name":"Foo?x=1","version":"1.0.0"}`, "")
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != 400 {
+		t.Fatalf("got %v, want *APIError with status 400 (invalid name, correctly routed) - a misrouted request would fail differently", err)
+	}
+}
+
 func TestSearch(t *testing.T) {
 	client, srv := newTestRegistry(t)
 	ctx := context.Background()
