@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"strings"
 
 	"github.com/zorvok-dev/zorvok-ios/internal/config"
 )
@@ -51,7 +52,12 @@ func registryURLExplicit() (url string, explicit bool, err error) {
 	}
 	merged := config.Merged(g, p)
 	if v, ok := merged.Get("registry_url"); ok && v != "" {
-		return v, true, nil
+		// A trailing slash is cosmetic to whoever typed `registry_url:
+		// https://example.com/` — but every call site below builds
+		// paths as url+"/v1/...", so left untrimmed it would produce
+		// a different (and wrong) URL than the slash-free spelling of
+		// the same registry.
+		return strings.TrimRight(v, "/"), true, nil
 	}
 	return "", false, nil
 }
