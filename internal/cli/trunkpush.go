@@ -35,9 +35,9 @@ func runTrunkPush(out, errOut io.Writer, args []string) int {
 		return exitErr(errOut, "determine working directory: %v", err)
 	}
 
-	client, url, token, ok := loggedInClient(errOut)
-	if !ok {
-		return 1
+	client, url, token, err := loggedInClient()
+	if err != nil {
+		return exitErr(errOut, "%v", err)
 	}
 
 	published, err := publisher.Push(context.Background(), out, errOut, cwd, client, token, opts)
