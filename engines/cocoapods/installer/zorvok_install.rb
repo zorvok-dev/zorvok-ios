@@ -91,21 +91,24 @@ begin
   config.podfile = augmented_podfile
 
   # Fix 2: refuse to silently disambiguate a pod that resolves from more
-  # than one source. Uses the real Analyzer#sources computation — the
-  # exact same one `installer.install!` is about to use internally — so
-  # this can never drift from what's actually about to be installed.
+  # than one source. This has to check every pod the install actually
+  # ends up using, not just the ones named directly in the Podfile:
+  # resolving the full dependency graph is what tells us which
+  # transitively-pulled-in pods are in play, and those can never be
+  # pinned to a source via the Podfile's `:source =>` syntax, so they're
+  # exactly as exploitable as a root-level one.
   if augmented_podfile.sources.size > 1
     analyzer = Pod::Installer::Analyzer.new(config.sandbox, augmented_podfile, config.lockfile)
     sources = analyzer.sources
 
-    # Podfile#dependencies (public, cocoapods-core) rather than
-    # Analyzer#podfile_dependencies (private) — same root dependencies,
-    # a stable public API.
-    ambiguous = augmented_podfile.dependencies.each_with_object({}) do |dep, found|
-      next if dep.podspec_repo # explicit `:source =>` pin on this pod: never ambiguous, it's pinned
+    pinned_names = augmented_podfile.dependencies.select(&:podspec_repo).map(&:root_name)
+    resolved_names = analyzer.analyze.specifications.map { |spec| spec.root.name }.uniq
 
-      matches = sources.select { |s| s.search(dep) }
-      found[dep.root_name] = matches if matches.size > 1
+    ambiguous = resolved_names.each_with_object({}) do |name, found|
+      next if pinned_names.include?(name)
+
+      matches = sources.select { |s| s.search(Pod::Dependency.new(name)) }
+      found[name] = matches if matches.size > 1
     end
 
     unless ambiguous.empty?
