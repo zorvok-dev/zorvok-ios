@@ -134,7 +134,9 @@ func TestInstallNativeFederatesUndeclaredDependency(t *testing.T) {
 
 	podGitDir := filepath.Join(root, "federated-pod-git")
 	copyRel(t, root, "federated-pod")
-	os.Rename(filepath.Join(root, "federated-pod"), podGitDir)
+	if err := os.Rename(filepath.Join(root, "federated-pod"), podGitDir); err != nil {
+		t.Fatal(err)
+	}
 	runGit(t, podGitDir, "init", "-q", "-b", "main")
 	runGit(t, podGitDir, "add", "-A")
 	runGit(t, podGitDir, "commit", "-q", "-m", "init")
@@ -142,7 +144,9 @@ func TestInstallNativeFederatesUndeclaredDependency(t *testing.T) {
 
 	specsRepoDir := filepath.Join(root, "specs-repo")
 	copyRel(t, root, "federated-specs-template")
-	os.Rename(filepath.Join(root, "federated-specs-template"), specsRepoDir)
+	if err := os.Rename(filepath.Join(root, "federated-specs-template"), specsRepoDir); err != nil {
+		t.Fatal(err)
+	}
 	podspecPath := filepath.Join(specsRepoDir, "Specs", "FederatedPod", "1.0.0", "FederatedPod.podspec.json")
 	content, err := os.ReadFile(podspecPath)
 	if err != nil {
