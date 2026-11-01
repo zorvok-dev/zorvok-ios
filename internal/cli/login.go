@@ -3,27 +3,28 @@ package cli
 import (
 	"context"
 	"io"
+	"strings"
 
 	zauth "github.com/zorvok-dev/zorvok-ios/internal/auth"
 	"github.com/zorvok-dev/zorvok-ios/internal/registry"
 )
 
-// runLogin implements `zorvok login <email> [name]`, mirroring CocoaPods
-// Trunk's registration UX (ARCHITECTURE.md §2.4): it issues a session
-// token immediately, stored locally for this machine, but the account
-// stays unverified — and therefore can't publish — until the emailed
-// verification link is visited. There is no real mail transport yet
-// (registry-server/auth.LogSender), so in local dev the link is printed
-// to the registry server's own log, not actually emailed.
+// runLogin implements `zorvok login <email> [display name...]`, mirroring
+// CocoaPods Trunk's registration UX: it issues a session token
+// immediately, stored locally for this machine, but the account stays
+// unverified — and therefore can't publish — until the emailed
+// verification link is visited. There is no real mail transport yet, so
+// in local dev the link is printed to the registry server's own log,
+// not actually emailed.
 func runLogin(out, errOut io.Writer, args []string) int {
 	if len(args) == 0 {
 		return exitErr(errOut, "usage: zorvok login <email> [display name]")
 	}
 	email := args[0]
-	name := ""
-	if len(args) > 1 {
-		name = args[1]
-	}
+	// Everything after the email is the display name — "Jane Doe", not
+	// just "Jane" — so it's joined rather than taking args[1] alone and
+	// silently dropping the rest.
+	name := strings.Join(args[1:], " ")
 
 	url, err := registryURL()
 	if err != nil {
