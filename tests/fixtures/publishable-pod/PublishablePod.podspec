@@ -2,7 +2,7 @@ Pod::Spec.new do |s|
   s.name         = "PublishablePod"
   s.version      = "1.0.0"
   s.summary      = "Fixture: a podspec with a fetchable-looking git source, used to test `zorvok trunk push`."
-  s.homepage     = "https://github.com/zorvok-dev/zorvok"
+  s.homepage     = "https://github.com/zorvok-dev/zorvok-ios"
   s.license      = "MIT"
   s.author       = { "Zorvok" => "dev@example.com" }
   # pod lib lint validates against the local checkout; it never actually

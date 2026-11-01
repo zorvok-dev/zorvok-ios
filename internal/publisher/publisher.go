@@ -33,22 +33,39 @@ type Options struct {
 // trunk push`'s own "no argument needed in a pod's own repo" ergonomics.
 // More than one or zero podspecs is an error — Zorvok never guesses
 // which one the user means.
+//
+// Lists the directory directly rather than filepath.Glob(dir +
+// "/*.podspec"): a dir containing a glob metacharacter ([, ], *, ?)
+// would otherwise have part of its own path misinterpreted as pattern
+// syntax, not just the "*.podspec" suffix. Dotfiles are excluded
+// (unlike Glob, which has no such convention) and only regular files
+// (or symlinks to one) are considered, so a stray directory or a
+// dangling symlink that happens to match the name pattern doesn't get
+// handed to `pod lib lint`/`pod ipc spec` with a confusing low-level
+// error.
 func FindPodspec(dir string) (string, error) {
-	matches, err := filepath.Glob(filepath.Join(dir, "*.podspec"))
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return "", fmt.Errorf("searching for a podspec: %w", err)
+	}
+	var matches []string
+	for _, e := range entries {
+		name := e.Name()
+		if strings.HasPrefix(name, ".") || !strings.HasSuffix(name, ".podspec") {
+			continue
+		}
+		if info, err := os.Stat(filepath.Join(dir, name)); err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		matches = append(matches, name)
 	}
 	switch len(matches) {
 	case 0:
 		return "", fmt.Errorf("no *.podspec file found in %s — pass one explicitly: zorvok trunk push MyPod.podspec", dir)
 	case 1:
-		return filepath.Base(matches[0]), nil
+		return matches[0], nil
 	default:
-		names := make([]string, len(matches))
-		for i, m := range matches {
-			names[i] = filepath.Base(m)
-		}
-		return "", fmt.Errorf("multiple podspecs found in %s (%s) — specify which one: zorvok trunk push <name>.podspec", dir, strings.Join(names, ", "))
+		return "", fmt.Errorf("multiple podspecs found in %s (%s) — specify which one: zorvok trunk push <name>.podspec", dir, strings.Join(matches, ", "))
 	}
 }
 
@@ -62,8 +79,10 @@ func Push(ctx context.Context, out, errOut io.Writer, dir string, client *regist
 			return nil, err
 		}
 		podspecPath = found
-	} else if _, err := os.Stat(filepath.Join(dir, podspecPath)); err != nil {
+	} else if info, err := os.Stat(filepath.Join(dir, podspecPath)); err != nil {
 		return nil, fmt.Errorf("%s: %w", podspecPath, err)
+	} else if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s is not a regular file", podspecPath)
 	}
 
 	if !opts.SkipLint {
@@ -123,7 +142,7 @@ func validateSourceIsFetchable(source map[string]any) error {
 		return fmt.Errorf("podspec has no `source` — add a :git, :http, :svn, or :hg source others can fetch from")
 	}
 	for _, key := range []string{"git", "http", "svn", "hg"} {
-		if _, ok := source[key]; ok {
+		if v, ok := source[key].(string); ok && strings.TrimSpace(v) != "" {
 			return nil
 		}
 	}
