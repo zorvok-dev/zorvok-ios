@@ -12,8 +12,12 @@ import (
 //
 // Like `git config`, settings are project-local (.zorvok.yml in the
 // current directory) by default; pass --global to target
-// ~/.config/zorvok/config.yml instead. With no subcommand, prints the
-// effective (project-over-global) merged settings.
+// ~/.config/zorvok/config.yml instead. With no subcommand (or with
+// `list`), prints the effective settings for that scope: the
+// project-over-global merge normally, or just the global file alone
+// when --global is given — matching `git config --global --list`'s
+// own scoping, rather than always showing the merged view regardless
+// of the flag.
 func runConfig(out, errOut io.Writer, args []string) int {
 	global := false
 	var positional []string
@@ -41,15 +45,20 @@ func runConfig(out, errOut io.Writer, args []string) int {
 	}
 
 	if len(positional) == 0 {
-		return configList(out, errOut, globalPath, projectPath)
+		return configList(out, errOut, globalPath, projectPath, global)
 	}
 
 	switch positional[0] {
 	case "get":
 		if len(positional) != 2 {
-			return exitErr(errOut, "usage: zorvok config get <key>")
+			return exitErr(errOut, "usage: zorvok config get <key> [--global]")
 		}
-		return configGet(out, errOut, globalPath, projectPath, positional[1])
+		return configGet(out, errOut, globalPath, projectPath, positional[1], global)
+	case "list":
+		if len(positional) != 1 {
+			return exitErr(errOut, "usage: zorvok config list [--global]")
+		}
+		return configList(out, errOut, globalPath, projectPath, global)
 	case "set":
 		if len(positional) != 3 {
 			return exitErr(errOut, "usage: zorvok config set <key> <value> [--global]")
@@ -61,44 +70,52 @@ func runConfig(out, errOut io.Writer, args []string) int {
 		}
 		return configUnset(out, errOut, targetPath, positional[1])
 	default:
-		return exitErr(errOut, "unknown config subcommand %q (expected get, set, unset, or no argument to list)", positional[0])
+		return exitErr(errOut, "unknown config subcommand %q (expected get, set, unset, list, or no argument to list)", positional[0])
 	}
 }
 
-func configList(out, errOut io.Writer, globalPath, projectPath string) int {
+// effectiveConfig resolves the settings a get/list call should read:
+// just the global file when global is true, or the project-over-global
+// merge otherwise.
+func effectiveConfig(globalPath, projectPath string, global bool) (*config.Config, error) {
 	g, err := config.Load(globalPath)
 	if err != nil {
-		return exitErr(errOut, "%v", err)
+		return nil, err
+	}
+	if global {
+		return g, nil
 	}
 	p, err := config.Load(projectPath)
 	if err != nil {
+		return nil, err
+	}
+	return config.Merged(g, p), nil
+}
+
+func configList(out, errOut io.Writer, globalPath, projectPath string, global bool) int {
+	cfg, err := effectiveConfig(globalPath, projectPath, global)
+	if err != nil {
 		return exitErr(errOut, "%v", err)
 	}
-	merged := config.Merged(g, p)
 
-	if len(merged.Keys()) == 0 {
+	if len(cfg.Keys()) == 0 {
 		fmt.Fprintln(out, "no configuration set. see: zorvok config set <key> <value>")
 		return 0
 	}
-	for _, k := range merged.Keys() {
-		v, _ := merged.Get(k)
+	for _, k := range cfg.Keys() {
+		v, _ := cfg.Get(k)
 		fmt.Fprintf(out, "%s = %s\n", k, v)
 	}
 	return 0
 }
 
-func configGet(out, errOut io.Writer, globalPath, projectPath, key string) int {
-	g, err := config.Load(globalPath)
+func configGet(out, errOut io.Writer, globalPath, projectPath, key string, global bool) int {
+	cfg, err := effectiveConfig(globalPath, projectPath, global)
 	if err != nil {
 		return exitErr(errOut, "%v", err)
 	}
-	p, err := config.Load(projectPath)
-	if err != nil {
-		return exitErr(errOut, "%v", err)
-	}
-	merged := config.Merged(g, p)
 
-	v, ok := merged.Get(key)
+	v, ok := cfg.Get(key)
 	if !ok {
 		return exitErr(errOut, "no value set for %q", key)
 	}

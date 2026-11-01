@@ -43,6 +43,9 @@ func runInstall(out, errOut io.Writer, args []string) int {
 	}
 
 	if native {
+		if len(rest) > 0 {
+			return exitErr(errOut, "--native does not support %v — the native installer has no equivalent of these `pod install` flags yet; drop --native to use them", rest)
+		}
 		if len(sources) == 0 && !noRegistry {
 			if url, explicit, err := registryURLExplicit(); err != nil {
 				return exitErr(errOut, "%v", err)
