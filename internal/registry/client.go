@@ -1,6 +1,6 @@
-// Package registry is a Go client for the Zorvok registry's HTTP API
-// (registry-server/api). Used by `zorvok login`/`trunk push`,
-// `zorvok search`/`info`, and internal/publisher.
+// Package registry is a Go client for a Zorvok registry's HTTP API.
+// Used by `zorvok login`/`trunk push`, `zorvok search`/`info`, and
+// internal/publisher.
 package registry
 
 import (
@@ -84,7 +84,7 @@ func (c *Client) PublishVersion(ctx context.Context, sessionToken, name, version
 	}{version, podspecJSON, source}
 
 	var resp PublishedVersion
-	path := fmt.Sprintf("/v1/packages/%s/versions", name)
+	path := fmt.Sprintf("/v1/packages/%s/versions", url.PathEscape(name))
 	if err := c.do(ctx, "POST", path, sessionToken, req, &resp); err != nil {
 		return nil, err
 	}
@@ -102,15 +102,15 @@ type PackageInfo struct {
 // GetPackage fetches a package's metadata — used by `zorvok info`.
 func (c *Client) GetPackage(ctx context.Context, name string) (*PackageInfo, error) {
 	var resp PackageInfo
-	if err := c.do(ctx, "GET", "/v1/packages/"+name, "", nil, &resp); err != nil {
+	if err := c.do(ctx, "GET", "/v1/packages/"+url.PathEscape(name), "", nil, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
 // Search queries the registry for packages matching query (a
-// case-insensitive substring match, server-side — registry-server/api's
-// handleSearch) — used by `zorvok search`.
+// case-insensitive substring match, server-side) — used by `zorvok
+// search`.
 func (c *Client) Search(ctx context.Context, query string) ([]PackageInfo, error) {
 	var resp []PackageInfo
 	path := "/v1/search?q=" + url.QueryEscape(query)
@@ -144,7 +144,7 @@ func (c *Client) AddOwner(ctx context.Context, sessionToken, name, account strin
 	req := struct {
 		Email string `json:"email"`
 	}{account}
-	path := fmt.Sprintf("/v1/packages/%s/owners", name)
+	path := fmt.Sprintf("/v1/packages/%s/owners", url.PathEscape(name))
 	return c.do(ctx, "POST", path, sessionToken, req, nil)
 }
 
@@ -155,7 +155,7 @@ func (c *Client) RemoveOwner(ctx context.Context, sessionToken, name, account st
 	req := struct {
 		Email string `json:"email"`
 	}{account}
-	path := fmt.Sprintf("/v1/packages/%s/owners/remove", name)
+	path := fmt.Sprintf("/v1/packages/%s/owners/remove", url.PathEscape(name))
 	return c.do(ctx, "POST", path, sessionToken, req, nil)
 }
 
@@ -165,7 +165,7 @@ func (c *Client) Deprecate(ctx context.Context, sessionToken, name, message stri
 	req := struct {
 		Message string `json:"message"`
 	}{message}
-	path := fmt.Sprintf("/v1/packages/%s/deprecate", name)
+	path := fmt.Sprintf("/v1/packages/%s/deprecate", url.PathEscape(name))
 	return c.do(ctx, "POST", path, sessionToken, req, nil)
 }
 
@@ -196,16 +196,39 @@ func (c *Client) do(ctx context.Context, method, path, sessionToken string, body
 	}
 	defer resp.Body.Close()
 
+	// Read the whole body up front (bounded, so a huge or broken
+	// response can't exhaust client memory either) — this also drains
+	// the connection before Close, letting the transport reuse it,
+	// rather than abandoning a partially-read body on every call.
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var errBody struct {
 			Error string `json:"error"`
 		}
-		json.NewDecoder(resp.Body).Decode(&errBody)
-		return &APIError{StatusCode: resp.StatusCode, Message: errBody.Error}
+		message := ""
+		if json.Unmarshal(respBody, &errBody) == nil && errBody.Error != "" {
+			message = errBody.Error
+		} else if msg := strings.TrimSpace(string(respBody)); msg != "" {
+			// Not the expected {"error": "..."} shape (a proxy's HTML
+			// error page, a truncated body, ...) — surface a snippet
+			// rather than leaving the caller with just a status code.
+			if len(msg) > 200 {
+				msg = msg[:200] + "…"
+			}
+			message = msg
+		}
+		return &APIError{StatusCode: resp.StatusCode, Message: message}
 	}
 
 	if out != nil {
-		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		if len(respBody) == 0 {
+			return fmt.Errorf("registry returned an empty success response")
+		}
+		if err := json.Unmarshal(respBody, out); err != nil {
 			return fmt.Errorf("decode response: %w", err)
 		}
 	}
