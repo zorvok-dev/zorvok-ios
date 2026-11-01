@@ -42,12 +42,10 @@ go install github.com/zorvok-dev/zorvok-ios/cmd/zorvok@main
 **Homebrew:**
 
 ```bash
-brew tap zorvok-dev/tap
-brew trust --tap zorvok-dev/tap   # required by current Homebrew for any non-core tap
-brew install zorvok
+brew install zorvok-dev/tap/zorvok
 ```
 
-The formula lives at [zorvok-dev/homebrew-tap](https://github.com/zorvok-dev/homebrew-tap); see that repo's README for release details.
+One command. The formula lives at [zorvok-dev/homebrew-tap](https://github.com/zorvok-dev/homebrew-tap); see that repo's README for why this fully-qualified form is worth using over `brew tap` + plain `brew install zorvok` (same end result, but this one trusts only the `zorvok` formula instead of the whole tap).
 
 Requires a Go toolchain matching [go.mod](go.mod)'s `go` directive to build, and a working `gem install cocoapods` (real CocoaPods) on `PATH` for anything beyond `--version`/`--help`/`init`/`config` — run `zorvok doctor` after installing to confirm your environment.
 
