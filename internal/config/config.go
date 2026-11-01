@@ -12,13 +12,13 @@ import (
 )
 
 // Config is a flat key/value settings store, serialized as YAML.
-// Milestone 1 scope is deliberately generic (arbitrary string settings,
-// e.g. "email", "default_registry") rather than a fully-typed schema:
-// structured registry/auth config lands with Milestones 3-5 once there
-// is a real registry API to shape it around.
+// It's deliberately generic (arbitrary string settings, e.g. "email",
+// "default_registry") rather than a fully-typed schema — most values
+// here are passed straight through to a registry API or CLI flag,
+// so a loose string beats a struct that has to be kept in lockstep.
 type Config struct {
 	Values map[string]string `yaml:",inline"`
-	path   string            `yaml:"-"`
+	path   string
 }
 
 // GlobalDir returns the directory holding Zorvok's global config and
@@ -31,6 +31,14 @@ func GlobalDir() (string, error) {
 	dir := filepath.Join(base, "zorvok")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", fmt.Errorf("create config dir %s: %w", dir, err)
+	}
+	// MkdirAll only applies the mode to directories it creates; one
+	// that already existed (e.g. left over at looser permissions by
+	// an older zorvok version, or created by something else) is
+	// returned as-is. This directory holds credentials.yml, so chmod
+	// it unconditionally rather than trusting whatever it already was.
+	if err := os.Chmod(dir, 0o700); err != nil {
+		return "", fmt.Errorf("tighten permissions on %s: %w", dir, err)
 	}
 	return dir, nil
 }
@@ -63,12 +71,25 @@ func Load(path string) (*Config, error) {
 	}
 
 	if len(data) > 0 {
-		if err := yaml.Unmarshal(data, &c.Values); err != nil {
+		var raw map[string]yaml.Node
+		if err := yaml.Unmarshal(data, &raw); err != nil {
 			return nil, fmt.Errorf("parse %s: %w", path, err)
 		}
-	}
-	if c.Values == nil {
-		c.Values = map[string]string{}
+		for key, node := range raw {
+			if node.Kind != yaml.ScalarNode {
+				// A list or mapping where a scalar belongs isn't a
+				// reason to refuse the whole file — one hand-edited
+				// key shouldn't lock a user out of every other
+				// setting they already have. Drop it, same as if it
+				// were never set.
+				continue
+			}
+			var v string
+			if err := node.Decode(&v); err != nil {
+				continue
+			}
+			c.Values[key] = v
+		}
 	}
 	return c, nil
 }
