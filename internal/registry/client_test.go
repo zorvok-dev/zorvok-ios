@@ -66,11 +66,11 @@ func TestPublishDuplicateVersionIsAPIError(t *testing.T) {
 	token := registerAndVerify(t, client, srv, "dev@example.com")
 
 	podspec := `{"name":"Alamofire","version":"1.0.0"}`
-	if _, err := client.PublishVersion(ctx, token, "Alamofire", "1.0.0", podspec, ""); err != nil {
+	if _, err := client.PublishVersion(ctx, token, "Alamofire", "1.0.0", podspec, "https://example.com/repo.git"); err != nil {
 		t.Fatalf("first publish: %v", err)
 	}
 
-	_, err := client.PublishVersion(ctx, token, "Alamofire", "1.0.0", podspec, "")
+	_, err := client.PublishVersion(ctx, token, "Alamofire", "1.0.0", podspec, "https://example.com/repo.git")
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != 409 {
 		t.Fatalf("got %v, want *APIError with status 409", err)
@@ -86,7 +86,7 @@ func TestPublishBeforeVerifyIsAPIError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = client.PublishVersion(ctx, token, "Alamofire", "1.0.0", `{"name":"Alamofire","version":"1.0.0"}`, "")
+	_, err = client.PublishVersion(ctx, token, "Alamofire", "1.0.0", `{"name":"Alamofire","version":"1.0.0"}`, "https://example.com/repo.git")
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != 403 {
 		t.Fatalf("got %v, want *APIError with status 403 (unverified account)", err)
@@ -131,7 +131,7 @@ func TestAddAndRemoveOwner(t *testing.T) {
 	aliceToken := registerAndVerify(t, client, srv, "alice@example.com")
 	registerAndVerify(t, client, srv, "bob@example.com")
 
-	if _, err := client.PublishVersion(ctx, aliceToken, "Alamofire", "1.0.0", `{"name":"Alamofire","version":"1.0.0"}`, ""); err != nil {
+	if _, err := client.PublishVersion(ctx, aliceToken, "Alamofire", "1.0.0", `{"name":"Alamofire","version":"1.0.0"}`, "https://example.com/repo.git"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -163,7 +163,7 @@ func TestRemoveLastOwnerIsAPIError(t *testing.T) {
 	ctx := context.Background()
 	aliceToken := registerAndVerify(t, client, srv, "alice@example.com")
 
-	if _, err := client.PublishVersion(ctx, aliceToken, "Alamofire", "1.0.0", `{"name":"Alamofire","version":"1.0.0"}`, ""); err != nil {
+	if _, err := client.PublishVersion(ctx, aliceToken, "Alamofire", "1.0.0", `{"name":"Alamofire","version":"1.0.0"}`, "https://example.com/repo.git"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -179,7 +179,7 @@ func TestDeprecate(t *testing.T) {
 	ctx := context.Background()
 	token := registerAndVerify(t, client, srv, "dev@example.com")
 
-	if _, err := client.PublishVersion(ctx, token, "Alamofire", "1.0.0", `{"name":"Alamofire","version":"1.0.0"}`, ""); err != nil {
+	if _, err := client.PublishVersion(ctx, token, "Alamofire", "1.0.0", `{"name":"Alamofire","version":"1.0.0"}`, "https://example.com/repo.git"); err != nil {
 		t.Fatal(err)
 	}
 	if err := client.Deprecate(ctx, token, "Alamofire", "use Alamofire2 instead"); err != nil {
@@ -211,7 +211,7 @@ func TestPackageNameWithURLMetacharactersReachesTheRightEndpoint(t *testing.T) {
 	ctx := context.Background()
 	token := registerAndVerify(t, client, srv, "dev@example.com")
 
-	_, err := client.PublishVersion(ctx, token, "Foo?x=1", "1.0.0", `{"name":"Foo?x=1","version":"1.0.0"}`, "")
+	_, err := client.PublishVersion(ctx, token, "Foo?x=1", "1.0.0", `{"name":"Foo?x=1","version":"1.0.0"}`, "https://example.com/repo.git")
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != 400 {
 		t.Fatalf("got %v, want *APIError with status 400 (invalid name, correctly routed) - a misrouted request would fail differently", err)
@@ -224,7 +224,7 @@ func TestSearch(t *testing.T) {
 	token := registerAndVerify(t, client, srv, "dev@example.com")
 
 	for _, name := range []string{"Alamofire", "SDWebImage"} {
-		if _, err := client.PublishVersion(ctx, token, name, "1.0.0", `{"name":"`+name+`","version":"1.0.0"}`, ""); err != nil {
+		if _, err := client.PublishVersion(ctx, token, name, "1.0.0", `{"name":"`+name+`","version":"1.0.0"}`, "https://example.com/repo.git"); err != nil {
 			t.Fatal(err)
 		}
 	}
