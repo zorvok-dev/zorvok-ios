@@ -1,0 +1,11 @@
+install! 'cocoapods', :integrate_targets => false
+platform :ios, '13.0'
+
+target 'App' do
+  use_frameworks!
+  # SharedPod is never named here — it only enters the graph as
+  # WrapperPod's own dependency. The ambiguity preflight check must
+  # catch this transitively-introduced collision too, not just a
+  # root-level one (tests/fixtures/ambiguous covers the root case).
+  pod 'WrapperPod'
+end

@@ -1,0 +1,12 @@
+{
+  "name": "WrapperPod",
+  "version": "1.0.0",
+  "summary": "Fixture: declares no source of its own, only a dependency on SharedPod — used to prove the ambiguity preflight check also catches a transitively-introduced collision, not just a root one.",
+  "homepage": "https://github.com/zorvok-dev/zorvok",
+  "license": "MIT",
+  "authors": {"Zorvok Wrapper": "dev-wrapper@example.com"},
+  "source": {"git": "ZORVOK_TRANSITIVE_WRAPPER_GIT_URL", "tag": "1.0.0"},
+  "platforms": {"ios": "13.0"},
+  "source_files": "Classes/**/*.{h,m}",
+  "dependencies": {"SharedPod": []}
+}

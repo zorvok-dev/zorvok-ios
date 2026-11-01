@@ -121,6 +121,60 @@ func TestInstallNativeAbortsOnAmbiguousSource(t *testing.T) {
 	}
 }
 
+// TestInstallNativeAbortsOnTransitiveAmbiguousSource proves the
+// ambiguity check also catches a collision introduced transitively —
+// a pod declared nowhere in the Podfile, only pulled in by another
+// pod's own `dependency`. The check used to look only at the
+// Podfile's own root-level dependencies, so this exact shape (the most
+// common one in a real dependency graph) went unchecked; it's provably
+// not just a narrower case of the root-level test above, since the
+// old code passed this scenario silently — see git history/ADR 0007.
+func TestInstallNativeAbortsOnTransitiveAmbiguousSource(t *testing.T) {
+	requirePod(t)
+	requireGit(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
+
+	root := t.TempDir()
+	podA := setupGitPodSource(t, root, "ambiguous/pod-a", "pod-a-git")
+	podB := setupGitPodSource(t, root, "ambiguous/pod-b", "pod-b-git")
+	specsA := setupGitSpecsRepo(t, root, "ambiguous/specs-a-template", "specs-a",
+		"Specs/SharedPod/1.0.0/SharedPod.podspec.json", "ZORVOK_AMBIGUOUS_POD_A_GIT_URL", "file://"+podA)
+	specsB := setupGitSpecsRepo(t, root, "ambiguous/specs-b-template", "specs-b",
+		"Specs/SharedPod/1.0.0/SharedPod.podspec.json", "ZORVOK_AMBIGUOUS_POD_B_GIT_URL", "file://"+podB)
+
+	wrapper := setupGitPodSource(t, root, "transitive-ambiguous/wrapper-pod", "wrapper-pod-git")
+	specsWrapper := setupGitSpecsRepo(t, root, "transitive-ambiguous/specs-wrapper-template", "specs-wrapper",
+		"Specs/WrapperPod/1.0.0/WrapperPod.podspec.json", "ZORVOK_TRANSITIVE_WRAPPER_GIT_URL", "file://"+wrapper)
+
+	copyRel(t, root, "transitive-ambiguous/project")
+	projectDir := filepath.Join(root, "transitive-ambiguous", "project")
+	podfilePath := filepath.Join(projectDir, "Podfile")
+	before, err := os.ReadFile(podfilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var out, errOut strings.Builder
+	// SharedPod is named nowhere in these --source args' declaration
+	// order relative to the Podfile — only WrapperPod's own podspec
+	// pulls it in.
+	err = InstallNative(&out, &errOut, projectDir, []string{"file://" + specsWrapper, "file://" + specsA, "file://" + specsB})
+	if err == nil {
+		t.Fatal("expected InstallNative to refuse a transitively-introduced ambiguous dependency")
+	}
+	if !strings.Contains(errOut.String(), "SharedPod") {
+		t.Errorf("expected the error to name the ambiguous transitive pod, got stderr: %s", errOut.String())
+	}
+
+	after, err := os.ReadFile(podfilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("the Podfile on disk was modified")
+	}
+}
+
 // TestInstallNativePinnedSourceBypassesAmbiguityCheck proves the fix
 // isn't overly broad: a dependency explicitly pinned to a source via
 // `:source =>` is never ambiguous, even when other sources also have a
