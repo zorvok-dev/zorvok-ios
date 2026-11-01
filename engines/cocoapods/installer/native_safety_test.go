@@ -43,6 +43,35 @@ func setupGitSpecsRepo(t *testing.T, root, templateRel, dirName, podspecRelPath,
 	return dir
 }
 
+// TestInstallNativeRejectsSourceURLInjection proves a `--source` value
+// (which can come from a project's own configured registry_url, not
+// just a flag a developer typed by hand) can't break out of the
+// generated Podfile text and run arbitrary Ruby. The shim builds
+// `source '<url>'\n` and hands the result to Pod::Podfile.from_ruby,
+// which evals it — a URL containing a single quote used to terminate
+// the string early and run anything after it.
+func TestInstallNativeRejectsSourceURLInjection(t *testing.T) {
+	requirePod(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "Podfile"), []byte("platform :ios, '13.0'\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(dir, "pwned")
+	payload := "https://example.com/specs.git'; system(%q{touch " + marker + "}); x='"
+
+	var out, errOut strings.Builder
+	// The malicious source can never resolve to anything real, so this
+	// is expected to fail — the only thing under test is that it fails
+	// WITHOUT running the injected command.
+	_ = InstallNative(&out, &errOut, dir, []string{payload})
+
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("injected Ruby executed — the malicious source URL broke out of the generated Podfile source line")
+	}
+}
+
 // TestInstallNativeAbortsOnAmbiguousSource is the Milestone 6 security
 // fix (ADR 0007): two sources both have a spec for the same pod/version,
 // with no explicit `:source =>` pin. Real CocoaPods only warns and
