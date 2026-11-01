@@ -39,11 +39,15 @@ go build -o zorvok ./cmd/zorvok
 go install github.com/zorvok-dev/zorvok-ios/cmd/zorvok@main
 ```
 
-**Homebrew** will eventually be the easiest path: the formula at [zorvok-dev/homebrew-tap](https://github.com/zorvok-dev/homebrew-tap) is built and passes `brew install`/`test`/`audit --strict`/`style` already, but it needs a tagged release on this repo before `brew install zorvok` actually resolves — see that tap repo's README for the release steps. Once that lands:
+**Homebrew:**
 
 ```bash
-brew install zorvok-dev/tap/zorvok
+brew tap zorvok-dev/tap
+brew trust --tap zorvok-dev/tap   # required by current Homebrew for any non-core tap
+brew install zorvok
 ```
+
+The formula lives at [zorvok-dev/homebrew-tap](https://github.com/zorvok-dev/homebrew-tap); see that repo's README for release details.
 
 Requires a Go toolchain matching [go.mod](go.mod)'s `go` directive to build, and a working `gem install cocoapods` (real CocoaPods) on `PATH` for anything beyond `--version`/`--help`/`init`/`config` — run `zorvok doctor` after installing to confirm your environment.
 
@@ -184,7 +188,6 @@ If your terminal isn't using a UTF-8 locale, set `LANG=en_US.UTF-8` first — Co
 - `zorvok-registry-ios` has no PostgreSQL backend yet (in-memory store only — data is lost on restart) and no real email transport (verification links are logged, not emailed).
 - `zorvok trunk push` doesn't yet publish to the static `zorvok-specs` registry (Tier 2) — only to a live `zorvok-registry-ios` server. Publishing to `zorvok-specs` is PR-based for now; see [its README](https://github.com/zorvok-dev/zorvok-specs#publishing-a-package).
 - No reserved-name or publisher-reputation policy beyond "verified email, first publisher wins" (registry) / GitHub-PR ownership (static registry).
-- `brew install zorvok` isn't live yet — see [Installing the CLI](#installing-the-cli) above.
 
 See [ROADMAP.md](ROADMAP.md) for the full status, milestone by milestone.
 
