@@ -2,7 +2,7 @@ package adapter
 
 import (
 	"bufio"
-	"fmt"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -93,7 +93,7 @@ func readShebang(path string) (string, error) {
 
 	scanner := bufio.NewScanner(f)
 	if !scanner.Scan() {
-		return "", fmt.Errorf("empty file")
+		return "", errors.New("empty file")
 	}
 	return parseShebang(scanner.Text()), nil
 }

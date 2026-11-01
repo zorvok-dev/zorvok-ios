@@ -88,23 +88,31 @@ func Capture(errOut io.Writer, dir string, args ...string) (string, error) {
 // script over stdin (`ruby -`) rather than writing it to a temp file —
 // script is a compile-time-embedded string (installer/zorvok_install.rb),
 // not something that needs a path on disk. args become the script's
-// ARGV. Used only by Milestone 6's native installer path (ADR 0002
-// Phase 3); everything else in this package shells to `pod` itself.
+// ARGV. Used only by the native installer path; everything else in
+// this package shells to `pod` itself.
 func RunRubyScript(out, errOut io.Writer, dir, script string, args ...string) error {
 	env, err := ResolveRubyEnv()
 	if err != nil {
 		return err
 	}
 
-	cmdArgs := append([]string{"-"}, args...)
+	// Two separate things need forcing to UTF-8, independently, on a
+	// machine with no locale configured (LANG/LC_ALL unset — common in
+	// minimal containers and CI, where Ruby otherwise assumes US-ASCII):
+	// the `-E UTF-8:UTF-8` flag sets the default external/internal
+	// encoding IO uses, but has no effect on how `ruby -` parses the
+	// script's own source read from stdin — that's controlled only by a
+	// `# encoding: UTF-8` magic comment. Without the flag, writing a
+	// string with so much as an em dash to out/errOut raises
+	// Encoding::InvalidByteSequenceError; without the comment, the
+	// script fails to parse at all the moment one appears in its source.
+	cmdArgs := append([]string{"-E", "UTF-8:UTF-8", "-"}, args...)
 	cmd := exec.Command(env.RubyPath, cmdArgs...)
 	cmd.Dir = dir
-	cmd.Stdin = strings.NewReader(script)
+	cmd.Stdin = strings.NewReader("# encoding: UTF-8\n" + script)
 	cmd.Stdout = out
 	cmd.Stderr = errOut
-	if env.GemHome != "" {
-		cmd.Env = append(os.Environ(), "GEM_HOME="+env.GemHome)
-	}
+	cmd.Env = rubyScriptEnv(env)
 
 	if err := cmd.Run(); err != nil {
 		var exitErr *exec.ExitError
@@ -114,6 +122,39 @@ func RunRubyScript(out, errOut io.Writer, dir, script string, args ...string) er
 		return fmt.Errorf("running ruby script: %w", err)
 	}
 	return nil
+}
+
+// rubyScriptEnv builds the environment for the embedded Ruby shim. It
+// starts from the inherited process environment but strips RUBYOPT and
+// any BUNDLE_* variable, which would otherwise let whatever Gemfile or
+// bundler context invoked `zorvok` leak into the shim and silently
+// change which CocoaPods gems it loads — defeating the whole point of
+// resolving env.GemHome from the real `pod` executable in the first
+// place. GEM_HOME and GEM_PATH are stripped too and, when
+// ResolveRubyEnv found a GEM_HOME (the Homebrew-wrapper shape), set to
+// exactly what the real `pod` wrapper script itself sets: GEM_HOME
+// alone, with GEM_PATH left unset so RubyGems computes it fresh from
+// GEM_HOME plus Ruby's own default gem path — explicitly pinning
+// GEM_PATH to GemHome looks equivalent but isn't: it excludes the
+// default path entirely, which is where Ruby's own bundled default
+// gems (minitest, and others `cocoapods-core` depends on) actually
+// live, breaking `require 'cocoapods'` outright.
+func rubyScriptEnv(env RubyEnv) []string {
+	inherited := os.Environ()
+	out := make([]string, 0, len(inherited)+1)
+	for _, kv := range inherited {
+		key, _, _ := strings.Cut(kv, "=")
+		switch {
+		case key == "RUBYOPT", strings.HasPrefix(key, "BUNDLE_"), key == "GEM_PATH", key == "GEM_HOME":
+			continue
+		default:
+			out = append(out, kv)
+		}
+	}
+	if env.GemHome != "" {
+		out = append(out, "GEM_HOME="+env.GemHome)
+	}
+	return out
 }
 
 // Version returns `pod --version`'s output.
