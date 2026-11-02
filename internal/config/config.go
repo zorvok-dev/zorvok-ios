@@ -22,13 +22,20 @@ type Config struct {
 }
 
 // GlobalDir returns the directory holding Zorvok's global config and
-// credentials, creating it if necessary.
+// credentials, creating it if necessary. ZORVOK_CONFIG_DIR, if set,
+// is used as-is instead of the OS-default location — mainly so a
+// test or a local demo against a throwaway registry can run without
+// touching the real machine's actual global config and credentials
+// (os.UserConfigDir() has no such override of its own).
 func GlobalDir() (string, error) {
-	base, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("determine user config dir: %w", err)
+	dir := os.Getenv("ZORVOK_CONFIG_DIR")
+	if dir == "" {
+		base, err := os.UserConfigDir()
+		if err != nil {
+			return "", fmt.Errorf("determine user config dir: %w", err)
+		}
+		dir = filepath.Join(base, "zorvok")
 	}
-	dir := filepath.Join(base, "zorvok")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", fmt.Errorf("create config dir %s: %w", dir, err)
 	}

@@ -115,6 +115,27 @@ func TestGlobalDirTightensPermissionsOnAnExistingDirectory(t *testing.T) {
 	}
 }
 
+// TestGlobalDirHonorsConfigDirOverride proves ZORVOK_CONFIG_DIR takes
+// the directory as-is instead of os.UserConfigDir()'s OS-default
+// location. Without this, there is no way to exercise the CLI's
+// login/publish flows against a throwaway registry without writing to
+// the real machine's actual global config and credentials.
+func TestGlobalDirHonorsConfigDirOverride(t *testing.T) {
+	override := filepath.Join(t.TempDir(), "sandboxed-zorvok-config")
+	t.Setenv("ZORVOK_CONFIG_DIR", override)
+
+	got, err := GlobalDir()
+	if err != nil {
+		t.Fatalf("GlobalDir: %v", err)
+	}
+	if got != override {
+		t.Fatalf("GlobalDir() = %q, want the ZORVOK_CONFIG_DIR override %q", got, override)
+	}
+	if info, err := os.Stat(got); err != nil || !info.IsDir() {
+		t.Fatalf("override directory was not created: %v", err)
+	}
+}
+
 func TestMergedProjectOverridesGlobal(t *testing.T) {
 	global, _ := Load(filepath.Join(t.TempDir(), "g.yml"))
 	global.Set("default_registry", "https://cocoapods.org")
