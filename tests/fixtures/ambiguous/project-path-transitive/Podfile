@@ -1,0 +1,10 @@
+install! 'cocoapods', :integrate_targets => false
+platform :ios, '13.0'
+
+target 'App' do
+  use_frameworks!
+  # WrapperPod itself is pinned by :path, but its dependency SharedPod
+  # resolves from spec repos like any other pod — and both federated
+  # sources offer it. Must still be refused.
+  pod 'WrapperPod', :path => '../local-wrapper-pod'
+end

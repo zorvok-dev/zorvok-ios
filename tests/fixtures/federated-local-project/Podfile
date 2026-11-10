@@ -1,0 +1,13 @@
+install! 'cocoapods', :integrate_targets => false
+platform :ios, '13.0'
+
+target 'App' do
+  use_frameworks!
+  # A :path pod alongside a federated one. With federation on, the
+  # ambiguity preflight analyzes this Podfile before install! runs, and
+  # analyzing a :path dependency fetches it into Pods/Local Podspecs/ —
+  # which used to crash with ENOENT because that directory didn't exist
+  # yet.
+  pod 'LocalPod', :path => '../local-pod'
+  pod 'FederatedPod', '1.0.0'
+end

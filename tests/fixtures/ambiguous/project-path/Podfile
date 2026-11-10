@@ -1,0 +1,10 @@
+install! 'cocoapods', :integrate_targets => false
+platform :ios, '13.0'
+
+target 'App' do
+  use_frameworks!
+  # Both federated sources also have SharedPod 1.0.0, but :path names
+  # this pod's exact location — CocoaPods never looks it up in a spec
+  # repo, so it can't be confused with either. Must install.
+  pod 'SharedPod', :path => '../local-shared-pod'
+end

@@ -125,10 +125,27 @@ begin
   # pinned to a source via the Podfile's `:source =>` syntax, so they're
   # exactly as exploitable as a root-level one.
   if podfile.sources.size > 1
+    # The preflight analyzer below runs before Pod::Installer#install!
+    # ever does — which is also where `sandbox.prepare` normally creates
+    # Pods/Local Podspecs/ and friends. For a Podfile with an external
+    # source (:path/:git), analyzing resolves and fetches it immediately
+    # (Analyzer#fetch_external_sources), which writes the fetched
+    # podspec into that directory — so without this, the preflight
+    # crashes with ENOENT the first time any pod in play isn't CDN-only.
+    # Sandbox#prepare is just a handful of idempotent mkdir_p calls, so
+    # calling it again later inside install! is harmless.
+    config.sandbox.prepare
     analyzer = Pod::Installer::Analyzer.new(config.sandbox, podfile, config.lockfile)
     sources = analyzer.sources
 
-    pinned_names = podfile.dependencies.select(&:podspec_repo).map(&:root_name)
+    # A dependency is pinned if the Podfile says exactly where it comes
+    # from: `:source =>` names a spec repo, and an external source
+    # (`:path`, `:git`, `:podspec`) names the pod's own location, which
+    # CocoaPods resolves directly and never looks up in any spec repo —
+    # so it can't be confused with a same-named pod elsewhere. Its own
+    # transitive dependencies still resolve from spec repos as usual,
+    # and are still checked below.
+    pinned_names = podfile.dependencies.select { |d| d.podspec_repo || d.external? }.map(&:root_name)
     resolved_names = analyzer.analyze.specifications.map { |spec| spec.root.name }.uniq
 
     ambiguous = resolved_names.each_with_object({}) do |name, found|
@@ -144,8 +161,9 @@ begin
       end.join("\n")
       raise Pod::Informative,
             "refusing to install — the following pods resolve from more than one " \
-            "source and have no explicit `:source =>` pin in the Podfile:\n#{details}\n" \
-            'Pin each one explicitly (e.g. `pod "Name", :source => "https://..."`) to proceed.'
+            "source and aren't pinned to one in the Podfile:\n#{details}\n" \
+            'Pin each one explicitly (e.g. `pod "Name", :source => "https://..."`, ' \
+            'or `:path`/`:git` for a local or forked copy) to proceed.'
     end
   end
 

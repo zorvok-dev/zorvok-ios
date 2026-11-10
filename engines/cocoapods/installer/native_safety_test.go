@@ -43,6 +43,33 @@ func setupGitSpecsRepo(t *testing.T, root, templateRel, dirName, podspecRelPath,
 	return dir
 }
 
+// setupAmbiguousSources builds two independent spec repos that both
+// offer SharedPod 1.0.0, each pointing at a different git source — the
+// shape every ambiguity test below needs.
+func setupAmbiguousSources(t *testing.T, root string) (specsA, specsB string) {
+	t.Helper()
+	podA := setupGitPodSource(t, root, "ambiguous/pod-a", "pod-a-git")
+	podB := setupGitPodSource(t, root, "ambiguous/pod-b", "pod-b-git")
+	specsA = setupGitSpecsRepo(t, root, "ambiguous/specs-a-template", "specs-a",
+		"Specs/SharedPod/1.0.0/SharedPod.podspec.json", "ZORVOK_AMBIGUOUS_POD_A_GIT_URL", "file://"+podA)
+	specsB = setupGitSpecsRepo(t, root, "ambiguous/specs-b-template", "specs-b",
+		"Specs/SharedPod/1.0.0/SharedPod.podspec.json", "ZORVOK_AMBIGUOUS_POD_B_GIT_URL", "file://"+podB)
+	return specsA, specsB
+}
+
+// useHermeticDefaultSource points the shim's implicit-default-CDN
+// fallback at a local spec repo instead of cdn.cocoapods.org, so a test
+// whose Podfile declares no `source` of its own never touches the
+// network.
+func useHermeticDefaultSource(t *testing.T, root string) {
+	t.Helper()
+	defaultPod := setupGitPodSource(t, root, "default-source-pod", "default-source-pod-git")
+	defaultSpecs := setupGitSpecsRepo(t, root, "default-source-template", "default-specs",
+		"Specs/DefaultSourcePod/1.0.0/DefaultSourcePod.podspec.json",
+		"ZORVOK_DEFAULT_SOURCE_POD_GIT_URL", "file://"+defaultPod)
+	t.Setenv("ZORVOK_DEFAULT_SOURCE_URL", "file://"+defaultSpecs)
+}
+
 // TestInstallNativeRejectsSourceURLInjection proves a `--source` value
 // (which can come from a project's own configured registry_url, not
 // just a flag a developer typed by hand) can't break out of the
@@ -85,12 +112,7 @@ func TestInstallNativeAbortsOnAmbiguousSource(t *testing.T) {
 	t.Setenv("CP_HOME_DIR", t.TempDir())
 
 	root := t.TempDir()
-	podA := setupGitPodSource(t, root, "ambiguous/pod-a", "pod-a-git")
-	podB := setupGitPodSource(t, root, "ambiguous/pod-b", "pod-b-git")
-	specsA := setupGitSpecsRepo(t, root, "ambiguous/specs-a-template", "specs-a",
-		"Specs/SharedPod/1.0.0/SharedPod.podspec.json", "ZORVOK_AMBIGUOUS_POD_A_GIT_URL", "file://"+podA)
-	specsB := setupGitSpecsRepo(t, root, "ambiguous/specs-b-template", "specs-b",
-		"Specs/SharedPod/1.0.0/SharedPod.podspec.json", "ZORVOK_AMBIGUOUS_POD_B_GIT_URL", "file://"+podB)
+	specsA, specsB := setupAmbiguousSources(t, root)
 
 	copyRel(t, root, "ambiguous/project")
 	projectDir := filepath.Join(root, "ambiguous", "project")
@@ -135,12 +157,7 @@ func TestInstallNativeAbortsOnTransitiveAmbiguousSource(t *testing.T) {
 	t.Setenv("CP_HOME_DIR", t.TempDir())
 
 	root := t.TempDir()
-	podA := setupGitPodSource(t, root, "ambiguous/pod-a", "pod-a-git")
-	podB := setupGitPodSource(t, root, "ambiguous/pod-b", "pod-b-git")
-	specsA := setupGitSpecsRepo(t, root, "ambiguous/specs-a-template", "specs-a",
-		"Specs/SharedPod/1.0.0/SharedPod.podspec.json", "ZORVOK_AMBIGUOUS_POD_A_GIT_URL", "file://"+podA)
-	specsB := setupGitSpecsRepo(t, root, "ambiguous/specs-b-template", "specs-b",
-		"Specs/SharedPod/1.0.0/SharedPod.podspec.json", "ZORVOK_AMBIGUOUS_POD_B_GIT_URL", "file://"+podB)
+	specsA, specsB := setupAmbiguousSources(t, root)
 
 	wrapper := setupGitPodSource(t, root, "transitive-ambiguous/wrapper-pod", "wrapper-pod-git")
 	specsWrapper := setupGitSpecsRepo(t, root, "transitive-ambiguous/specs-wrapper-template", "specs-wrapper",
@@ -185,12 +202,7 @@ func TestInstallNativePinnedSourceBypassesAmbiguityCheck(t *testing.T) {
 	t.Setenv("CP_HOME_DIR", t.TempDir())
 
 	root := t.TempDir()
-	podA := setupGitPodSource(t, root, "ambiguous/pod-a", "pod-a-git")
-	podB := setupGitPodSource(t, root, "ambiguous/pod-b", "pod-b-git")
-	specsA := setupGitSpecsRepo(t, root, "ambiguous/specs-a-template", "specs-a",
-		"Specs/SharedPod/1.0.0/SharedPod.podspec.json", "ZORVOK_AMBIGUOUS_POD_A_GIT_URL", "file://"+podA)
-	specsB := setupGitSpecsRepo(t, root, "ambiguous/specs-b-template", "specs-b",
-		"Specs/SharedPod/1.0.0/SharedPod.podspec.json", "ZORVOK_AMBIGUOUS_POD_B_GIT_URL", "file://"+podB)
+	specsA, specsB := setupAmbiguousSources(t, root)
 
 	copyRel(t, root, "ambiguous/project-pinned")
 	projectDir := filepath.Join(root, "ambiguous", "project-pinned")
@@ -265,5 +277,111 @@ func TestInstallNativePreservesImplicitDefaultSource(t *testing.T) {
 	}
 	if !strings.Contains(lockStr, "FederatedPod (1.0.0)") {
 		t.Errorf("FederatedPod missing:\n%s", lockStr)
+	}
+}
+
+// TestInstallNativeFederationWithLocalPathPod covers the most ordinary
+// federated Podfile there is: one `:path` pod next to one federated
+// pod. Any federation means more than one source, which turns on the
+// ambiguity preflight — and that preflight analyzes the Podfile before
+// Pod::Installer#install! has run Sandbox#prepare. Analyzing a :path
+// dependency writes its podspec into Pods/Local Podspecs/, so without
+// the directory already there this crashed with
+// Errno::ENOENT ... Pods/Local Podspecs/LocalPod.podspec.json.
+func TestInstallNativeFederationWithLocalPathPod(t *testing.T) {
+	requirePod(t)
+	requireGit(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
+
+	root := t.TempDir()
+	useHermeticDefaultSource(t, root)
+	federatedPod := setupGitPodSource(t, root, "federated-pod", "federated-pod-git")
+	federatedSpecs := setupGitSpecsRepo(t, root, "federated-specs-template", "federated-specs",
+		"Specs/FederatedPod/1.0.0/FederatedPod.podspec.json",
+		"ZORVOK_FEDERATED_POD_GIT_URL", "file://"+federatedPod)
+
+	copyRel(t, root, "local-pod")
+	copyRel(t, root, "federated-local-project")
+	projectDir := filepath.Join(root, "federated-local-project")
+
+	var out, errOut strings.Builder
+	if err := InstallNative(&out, &errOut, projectDir, []string{"file://" + federatedSpecs}); err != nil {
+		t.Fatalf("InstallNative: %v\nstdout:\n%s\nstderr:\n%s", err, out.String(), errOut.String())
+	}
+
+	lock, err := os.ReadFile(filepath.Join(projectDir, "Podfile.lock"))
+	if err != nil {
+		t.Fatalf("Podfile.lock was not created: %v", err)
+	}
+	for _, want := range []string{"LocalPod (0.1.0)", "FederatedPod (1.0.0)"} {
+		if !strings.Contains(string(lock), want) {
+			t.Errorf("Podfile.lock missing %s:\n%s", want, lock)
+		}
+	}
+}
+
+// TestInstallNativePathPinnedPodBypassesAmbiguityCheck: a pod declared
+// with `:path` names its own exact location, and CocoaPods resolves it
+// from there without consulting any spec repo — so it can't be
+// confused with a same-named pod in one, however many sources offer
+// it. The check used to exempt only `:source =>` pins, which refused
+// the everyday case of developing against a local checkout of a
+// public pod the moment federation was turned on.
+func TestInstallNativePathPinnedPodBypassesAmbiguityCheck(t *testing.T) {
+	requirePod(t)
+	requireGit(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
+
+	root := t.TempDir()
+	useHermeticDefaultSource(t, root)
+	specsA, specsB := setupAmbiguousSources(t, root)
+
+	copyRel(t, root, "ambiguous/local-shared-pod")
+	copyRel(t, root, "ambiguous/project-path")
+	projectDir := filepath.Join(root, "ambiguous", "project-path")
+
+	var out, errOut strings.Builder
+	err := InstallNative(&out, &errOut, projectDir, []string{"file://" + specsA, "file://" + specsB})
+	if err != nil {
+		t.Fatalf("InstallNative: %v\nstdout:\n%s\nstderr:\n%s", err, out.String(), errOut.String())
+	}
+
+	lock, err := os.ReadFile(filepath.Join(projectDir, "Podfile.lock"))
+	if err != nil {
+		t.Fatalf("Podfile.lock was not created: %v", err)
+	}
+	if !strings.Contains(string(lock), ":path: \"../local-shared-pod\"") {
+		t.Fatalf("SharedPod wasn't installed from its :path:\n%s", lock)
+	}
+}
+
+// TestInstallNativePathPinnedPodStillChecksItsDependencies keeps the
+// :path exemption from being too broad: it covers the pinned pod
+// itself, not what that pod depends on. WrapperPod is local, but its
+// dependency SharedPod resolves from spec repos like any other pod —
+// and two sources offer it, so this must still be refused.
+func TestInstallNativePathPinnedPodStillChecksItsDependencies(t *testing.T) {
+	requirePod(t)
+	requireGit(t)
+	t.Setenv("CP_HOME_DIR", t.TempDir())
+
+	root := t.TempDir()
+	useHermeticDefaultSource(t, root)
+	specsA, specsB := setupAmbiguousSources(t, root)
+
+	copyRel(t, root, "ambiguous/local-wrapper-pod")
+	copyRel(t, root, "ambiguous/project-path-transitive")
+	projectDir := filepath.Join(root, "ambiguous", "project-path-transitive")
+
+	var out, errOut strings.Builder
+	err := InstallNative(&out, &errOut, projectDir, []string{"file://" + specsA, "file://" + specsB})
+	if err == nil {
+		t.Fatal("expected InstallNative to refuse: the :path pod's own dependency is ambiguous")
+	}
+	if !strings.Contains(errOut.String(), "SharedPod") {
+		t.Errorf("expected the error to name SharedPod, got stderr: %s", errOut.String())
+	}
+	if _, err := os.Stat(filepath.Join(projectDir, "Podfile.lock")); err == nil {
+		t.Error("Podfile.lock must not be written when installation is refused")
 	}
 }
