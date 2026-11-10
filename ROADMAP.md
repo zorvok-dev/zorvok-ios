@@ -66,7 +66,7 @@ CLI, Homebrew tap, documentation, and public registry — versioned and backward
 
 **Command parity with CocoaPods: done.** Every command in `pod --help` has a Zorvok equivalent — the registry-native `trunk` family (`register`/`me`/`push`/`add-owner`/`remove-owner`/`deprecate`/`info`; `delete` refuses and points at `deprecate`, since published versions are immutable by design), plus generic delegation for every pass-through command (`spec`, `cache`, `ipc`, `plugins`, `list`, `outdated`, `try`, `env`, `setup`, `deintegrate`, `lib create`, `registry lint`/`push`). See the README's command reference.
 
-**Homebrew: built, not yet publishable.** The formula passes `brew install`/`test`/`audit --strict`/`style`. It can't resolve until `zorvok-ios` has a tagged release for its `url`/`sha256` to point at — see the tap repo's README for the release steps. In the meantime, `go install github.com/zorvok-dev/zorvok-ios/cmd/zorvok@main` already works.
+**Homebrew: live.** `zorvok-ios` has a tagged `v0.1.0` release, `zorvok-dev/homebrew-tap` is public, and `brew install zorvok-dev/tap/zorvok` installs the real thing end to end — verified against the actual GitHub release tarball, not just a local build. See the tap repo's README for the release process for future versions.
 
 ## Milestone 9 — Three-tier registry split ✅
 The registry became three tiers instead of one server: CocoaPods' own, a free static public registry, and a self-hostable server — the Maven model, a public index plus an optional self-hosted Nexus/Artifactory equivalent ([ADR 0009](docs/adr/0009-three-tier-registry-model.md)).
@@ -80,7 +80,7 @@ Confirmed with a plain static file server standing in for GitHub Pages: `zorvok 
 Not done: `trunk push` still only publishes to a live registry server, not to `zorvok-specs` — PR-based publishing only, for now. The GitHub Actions workflow YAML hasn't run against real GitHub Actions yet; only the scripts it calls are tested locally. GitHub Pages isn't enabled for that repo yet either, so `raw.githubusercontent.com` serves the same files in the meantime.
 
 ## Publishing this repository
-`zorvok-ios` and `zorvok-specs` are pushed to GitHub and public. `zorvok-registry-ios` is pushed and kept private, since it holds the registry's internal implementation. `homebrew-tap` exists locally, built and verified, but hasn't been pushed yet — see Milestone 7.
+`zorvok-ios`, `zorvok-specs`, and `homebrew-tap` are pushed to GitHub and public. `zorvok-registry-ios` is pushed and kept private, since it holds the registry's internal implementation.
 
 ---
 

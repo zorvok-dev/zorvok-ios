@@ -193,7 +193,7 @@ See [ROADMAP.md](ROADMAP.md) for the full status, milestone by milestone.
 
 - [zorvok-dev/zorvok-specs](https://github.com/zorvok-dev/zorvok-specs) — the free public registry (Tier 2)
 - [zorvok-dev/zorvok-registry-ios](https://github.com/zorvok-dev/zorvok-registry-ios) — the self-hostable registry server (Tier 3)
-- [zorvok-dev/homebrew-tap](https://github.com/zorvok-dev/homebrew-tap) — the Homebrew formula (not yet publishable — see above)
+- [zorvok-dev/homebrew-tap](https://github.com/zorvok-dev/homebrew-tap) — the Homebrew formula (`brew install zorvok-dev/tap/zorvok` — see above)
 
 ## Scope
 
