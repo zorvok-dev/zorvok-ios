@@ -69,9 +69,43 @@ func FindPodspec(dir string) (string, error) {
 	}
 }
 
-// Push runs the full publish workflow and returns the published
-// version's registry record.
+// Prepared is a podspec that passed lint (unless skipped), was converted
+// to JSON, and has a source other machines can fetch — everything `trunk
+// push` checks before it contacts a registry of either kind.
+type Prepared struct {
+	Name    string
+	Version string
+	// JSON is the podspec's `pod ipc spec` output, published verbatim.
+	JSON   string
+	Source map[string]any
+}
+
+// SourceSummary renders the podspec's source as compact JSON.
+func (p *Prepared) SourceSummary() string {
+	return sourceSummary(p.Source)
+}
+
+// Push runs the full publish workflow against a Zorvok registry server
+// and returns the published version's registry record.
 func Push(ctx context.Context, out, errOut io.Writer, dir string, client *registry.Client, sessionToken string, opts Options) (*registry.PublishedVersion, error) {
+	p, err := Prepare(out, errOut, dir, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Fprintf(out, "-> Publishing %s %s\n", p.Name, p.Version)
+	published, err := client.PublishVersion(ctx, sessionToken, p.Name, p.Version, p.JSON, p.SourceSummary())
+	if err != nil {
+		return nil, err
+	}
+	return published, nil
+}
+
+// Prepare finds the podspec, lints it, converts it to JSON and checks its
+// source — the steps every `trunk push` shares, whether it then publishes
+// to a registry server (Push) or to the public registry
+// (internal/publicregistry).
+func Prepare(out, errOut io.Writer, dir string, opts Options) (*Prepared, error) {
 	podspecPath := opts.PodspecPath
 	if podspecPath == "" {
 		found, err := FindPodspec(dir)
@@ -85,12 +119,12 @@ func Push(ctx context.Context, out, errOut io.Writer, dir string, client *regist
 		return nil, fmt.Errorf("%s is not a regular file", podspecPath)
 	}
 
-	// ctx isn't passed to podspec.Lint/podspec.JSON below — neither
-	// accepts one; they shell out via exec.Command, not
+	// Prepare takes no ctx because podspec.Lint/podspec.JSON below can't
+	// use one; they shell out via exec.Command, not
 	// exec.CommandContext. A `pod lib lint` or `pod ipc spec` that
-	// hangs can't be cancelled by ctx the way the PublishVersion call
-	// further down can. Fixing that belongs in engines/cocoapods
-	// alongside those functions, not here.
+	// hangs can't be cancelled the way the registry calls after it can.
+	// Fixing that belongs in engines/cocoapods alongside those
+	// functions, not here.
 	if !opts.SkipLint {
 		fmt.Fprintf(out, "-> Linting %s\n", podspecPath)
 		lintArgs := []string{podspecPath}
@@ -115,13 +149,7 @@ func Push(ctx context.Context, out, errOut io.Writer, dir string, client *regist
 	if err := validateSourceIsFetchable(source); err != nil {
 		return nil, err
 	}
-
-	fmt.Fprintf(out, "-> Publishing %s %s\n", name, version)
-	published, err := client.PublishVersion(ctx, sessionToken, name, version, podspecJSON, sourceSummary(source))
-	if err != nil {
-		return nil, err
-	}
-	return published, nil
+	return &Prepared{Name: name, Version: version, JSON: podspecJSON, Source: source}, nil
 }
 
 func parsePodspec(podspecJSON string) (name, version string, source map[string]any, err error) {

@@ -51,7 +51,7 @@ var registeredCommands = []command{
 	{"lib lint", "Validate a podspec (delegates to `pod lib lint`)", runLibLint, true},
 	{"login", "Authenticate with the Zorvok registry", runLogin, true},
 	{"trunk register", "Authenticate with the Zorvok registry (alias of `zorvok login`)", runTrunkRegister, true},
-	{"trunk push", "Publish a podspec to the Zorvok registry", runTrunkPush, true},
+	{"trunk push", "Publish a podspec to Zorvok's public registry (or to the registry server registry_url names)", runTrunkPush, true},
 	{"trunk me", "Show the account behind this machine's stored session", runTrunkMe, true},
 	{"trunk add-owner", "Grant another account publish rights on a pod you own", runTrunkAddOwner, true},
 	{"trunk remove-owner", "Revoke an account's publish rights on a pod you own", runTrunkRemoveOwner, true},

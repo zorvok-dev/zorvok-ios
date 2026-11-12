@@ -77,7 +77,9 @@ The registry became three tiers instead of one server: CocoaPods' own, a free st
 
 Confirmed with a plain static file server standing in for GitHub Pages: `zorvok install --native --source` correctly detected it as a CDN source and installed from it, no server-side code involved. A test pod name happened to collide with a real public CocoaPods pod along the way — `zorvok install` correctly refused to resolve it rather than silently picking a source, an unplanned but useful confirmation of the ADR 0007 guard.
 
-Not done: `trunk push` still only publishes to a live registry server, not to `zorvok-specs` — PR-based publishing only, for now. The GitHub Actions workflow YAML hasn't run against real GitHub Actions yet; only the scripts it calls are tested locally. GitHub Pages isn't enabled for that repo yet either, so `raw.githubusercontent.com` serves the same files in the meantime.
+Since v0.1.2, `trunk push` publishes to `zorvok-specs` in one command, like `pod trunk push`: it opens the pull request itself, and the registry's publish workflow checks and merges it ([ADR 0010](docs/adr/0010-trunk-push-to-the-public-registry.md)).
+
+Not done: the GitHub Actions workflow YAML hasn't run against real GitHub Actions yet. The scripts it calls are tested locally, and its script block has run end to end against a local git repository. GitHub Pages isn't enabled for that repo yet either, so `raw.githubusercontent.com` serves the same files in the meantime.
 
 ## Publishing this repository
 `zorvok-ios`, `zorvok-specs`, and `homebrew-tap` are pushed to GitHub and public. `zorvok-registry-ios` is pushed and kept private, since it holds the registry's internal implementation.

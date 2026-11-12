@@ -170,6 +170,8 @@ zorvok/
 │   ├── auth/                     # local credential storage (per-registry-host session tokens)
 │   ├── registry/                 # Go HTTP client for the registry REST API
 │   ├── registrytest/             # starts a real zorvok-registry subprocess for tests (ADR 0009)
+│   ├── publicregistry/           # trunk push to zorvok-specs via GitHub pull requests (ADR 0010)
+│   ├── githubtest/               # in-memory fake of the GitHub API slice publicregistry uses
 │   ├── installer/                # orchestrates engines/cocoapods
 │   └── publisher/                # lib lint + trunk push orchestration
 ├── engines/cocoapods/

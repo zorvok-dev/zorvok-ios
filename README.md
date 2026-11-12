@@ -79,19 +79,30 @@ zorvok install --native --no-registry   # opt out for a single run, once configu
 
 ### Publishing your own package
 
+Like `pod trunk push`, publishing is one command. Only the podspec goes to the registry; your code, frameworks and xcframeworks stay wherever its `source` points.
+
 ```bash
+gh auth login                          # once: the public registry uses your GitHub account
+cd /path/to/your/pod/with/a/single/MyPod.podspec
+zorvok trunk push                      # lints, converts via `pod ipc spec`, publishes
+```
+
+With no `registry_url` configured (or with it set to the public registry), `trunk push` publishes to Zorvok's free public registry, [zorvok-specs](https://github.com/zorvok-dev/zorvok-specs). That registry is a git repository with no server, so GitHub does the committing ([ADR 0010](docs/adr/0010-trunk-push-to-the-public-registry.md)). `trunk push` commits the podspec's JSON to your fork of it and opens a pull request; the registry's publish check verifies ownership and that no published version changes, then merges it, usually within a minute. `trunk push` waits for that and prints `Published MyPod 1.0.0`.
+
+A pod's first publisher becomes its owner, and only its owners can publish later versions. The first Zorvok publish of a name that already exists on CocoaPods trunk waits for a one-time maintainer review, so nobody can claim someone else's pod. Without the GitHub CLI, set `GITHUB_TOKEN` instead of running `gh auth login`.
+
+To publish to your own Zorvok registry server instead, point `registry_url` at it and sign in with `zorvok login`:
+
+```bash
+zorvok config set registry_url https://pods.example.com --global
 zorvok login you@example.com "Your Name"
 # a verification link is printed to the registry server's own log (no real email
 # transport is implemented yet — see Known gaps below) — open it before publishing
-
-cd /path/to/your/pod/with/a/single/MyPod.podspec
-zorvok trunk push                      # lints, converts via `pod ipc spec`, publishes
+zorvok trunk push
 zorvok trunk info MyPod                # confirm it published
 zorvok trunk add-owner MyPod teammate@example.com
 zorvok trunk deprecate MyPod --in-favor-of=BetterPod
 ```
-
-`trunk push` publishes to whichever registry `registry_url` is configured to (defaults to `http://localhost:8080`, a local dev server — never a hardcoded production endpoint). It does not yet publish directly to the static `zorvok-specs` registry (Tier 2) — that one is published to via pull request; see [its README](https://github.com/zorvok-dev/zorvok-specs#publishing-a-package).
 
 ## Command reference
 
@@ -143,12 +154,12 @@ Every command below is implemented today. Anything that delegates to `pod` requi
 | `zorvok registry lint NAME` | Validate every spec in a repo |
 | `zorvok registry push NAME [PODSPEC]` | Push specs to a git-backed spec repo |
 
-**Publishing and accounts — `trunk`** (Zorvok's own registry API — see `internal/registry` and [zorvok-registry-ios](https://github.com/zorvok-dev/zorvok-registry-ios))
+**Publishing and accounts — `trunk`** (`trunk push` publishes to the public registry by default, as above; the rest talk to a Zorvok registry server's API — see `internal/registry` and [zorvok-registry-ios](https://github.com/zorvok-dev/zorvok-registry-ios))
 
 | Command | What it does |
 |---|---|
 | `zorvok login EMAIL [NAME]` / `zorvok trunk register EMAIL [NAME]` | Register (or re-register, to resend verification) an account and store a session token for this machine |
-| `zorvok trunk push [PODSPEC] [--allow-warnings] [--skip-lint]` | Lint, convert, and publish a podspec to the configured registry |
+| `zorvok trunk push [PODSPEC] [--allow-warnings] [--skip-lint]` | Lint, convert, and publish a podspec: to the public registry by default (through a pull request the registry merges itself), or to the registry server `registry_url` names |
 | `zorvok trunk me` | Show the account behind this machine's stored session |
 | `zorvok trunk add-owner POD OWNER-EMAIL` | Grant another account publish rights on a pod you own |
 | `zorvok trunk remove-owner POD OWNER-EMAIL` | Revoke an account's publish rights (refuses to remove a pod's last owner) |
@@ -184,8 +195,8 @@ If your terminal isn't using a UTF-8 locale, set `LANG=en_US.UTF-8` first — Co
 ## Known gaps
 
 - `zorvok-registry-ios` has no PostgreSQL backend yet (in-memory store only — data is lost on restart) and no real email transport (verification links are logged, not emailed).
-- `zorvok trunk push` doesn't yet publish to the static `zorvok-specs` registry (Tier 2) — only to a live `zorvok-registry-ios` server. Publishing to `zorvok-specs` is PR-based for now; see [its README](https://github.com/zorvok-dev/zorvok-specs#publishing-a-package).
-- No reserved-name or publisher-reputation policy beyond "verified email, first publisher wins" (registry) / GitHub-PR ownership (static registry).
+- The public registry's publish workflow hasn't run on GitHub Actions yet. The scripts it calls are tested locally, and its script block has run end to end against a local git repository; the first real publish is the remaining check.
+- No reserved-name or publisher-reputation policy beyond "verified email, first publisher wins" (registry server) / "first publisher wins, except a name already on CocoaPods trunk needs a maintainer's review" (public registry).
 
 See [ROADMAP.md](ROADMAP.md) for the full status, milestone by milestone.
 
