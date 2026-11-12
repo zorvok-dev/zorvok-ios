@@ -89,7 +89,7 @@ zorvok trunk push                      # lints, converts via `pod ipc spec`, pub
 
 With no `registry_url` configured (or with it set to the public registry), `trunk push` publishes to Zorvok's free public registry, [zorvok-specs](https://github.com/zorvok-dev/zorvok-specs). That registry is a git repository with no server, so GitHub does the committing ([ADR 0010](docs/adr/0010-trunk-push-to-the-public-registry.md)). `trunk push` commits the podspec's JSON to your fork of it and opens a pull request; the registry's publish check verifies ownership and that no published version changes, then merges it, usually within a minute. `trunk push` waits for that and prints `Published MyPod 1.0.0`.
 
-A pod's first publisher becomes its owner, and only its owners can publish later versions. The first Zorvok publish of a name that already exists on CocoaPods trunk waits for a one-time maintainer review, so nobody can claim someone else's pod. Without the GitHub CLI, set `GITHUB_TOKEN` instead of running `gh auth login`.
+A pod's first publisher becomes its owner, and only its owners can publish later versions. A pod that already exists on CocoaPods trunk can only be published by one of its owners there. That's checked automatically against trunk's own records, usually through the email you registered with `pod trunk register`; if it can't match you, `trunk push` says exactly how to prove it. No maintainer is involved at any point. Without the GitHub CLI, set `GITHUB_TOKEN` instead of running `gh auth login`.
 
 To publish to your own Zorvok registry server instead, point `registry_url` at it and sign in with `zorvok login`:
 
@@ -196,7 +196,7 @@ If your terminal isn't using a UTF-8 locale, set `LANG=en_US.UTF-8` first — Co
 
 - `zorvok-registry-ios` has no PostgreSQL backend yet (in-memory store only — data is lost on restart) and no real email transport (verification links are logged, not emailed).
 - The public registry's publish workflow hasn't run on GitHub Actions yet. The scripts it calls are tested locally, and its script block has run end to end against a local git repository; the first real publish is the remaining check.
-- No reserved-name or publisher-reputation policy beyond "verified email, first publisher wins" (registry server) / "first publisher wins, except a name already on CocoaPods trunk needs a maintainer's review" (public registry).
+- No reserved-name or publisher-reputation policy on a registry server beyond "verified email, first publisher wins". The public registry also keeps names that exist on CocoaPods trunk with their trunk owners, but has no policy for names that don't.
 
 See [ROADMAP.md](ROADMAP.md) for the full status, milestone by milestone.
 

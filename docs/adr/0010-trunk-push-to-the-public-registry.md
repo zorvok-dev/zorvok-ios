@@ -19,7 +19,7 @@ GitHub plays trunk.cocoapods.org's part:
 - **`trunk push` waits for that verdict** — on its own commit, posted by `github-actions[bot]`, nothing else counts — and reports it the way `pod trunk push` would: `Published MyPod 1.0.0`, or why not.
 - **Routing**: with no `registry_url`, or with `registry_url` set to any of the public registry's addresses, `trunk push` publishes there. A `registry_url` naming anything else is a registry server, published to as before, with `zorvok login`.
 
-What still needs a person (`publish-policy.sh`), so the automation can't be turned against anyone:
+What still needed a person (`publish-policy.sh`), so the automation couldn't be turned against anyone — **superseded by the amendment below, which removes the person entirely**:
 
 - **A name that's already on CocoaPods trunk**, on its first Zorvok publish. Otherwise anyone could claim `Alamofire` here first. A maintainer confirms it once; that pod's later versions publish automatically, held to its OWNERS. Trunk is checked through the same sharded index files CocoaPods' own CDN source reads.
 - **Anything other than adding podspecs** (plus a new pod's OWNERS): an OWNERS edit, a change to the registry's scripts or workflows, an OWNERS file with no version.
@@ -32,3 +32,14 @@ What still needs a person (`publish-policy.sh`), so the automation can't be turn
 - A merge made with a workflow's token doesn't trigger other workflows, so the publish workflow regenerates the index itself; `regenerate-index.yml` still covers merges a maintainer makes by hand. Both go through `push-index.sh`, which retries when they race.
 - `trunk add-owner`/`remove-owner`/`deprecate` still only talk to a registry server. On the public registry, co-owners are added with a pull request editing OWNERS, which a maintainer reviews.
 - The workflow YAML hasn't run on GitHub Actions yet. Its scripts are tested locally (`test-validate-pr.sh`, `test-publish-policy.sh`), and its script block was run end to end against a local git origin with a stand-in for `gh`; the first real publish is the remaining check.
+
+## Amendment (2026-11-13): no human in the loop
+
+A one-time maintainer review doesn't match CocoaPods, where `pod trunk push` decides on its own, instantly. Every case that waited for a person is now decided automatically, as published or rejected:
+
+- **A name that's already on CocoaPods trunk** can only be published here by one of its owners there, CocoaPods' own rule. `verify-trunk-owner.sh` decides from trunk's records, never from anything in the pull request. Trunk's API lists the pod's owners by email, and its latest podspec names the pod's repository and homepage. The publisher qualifies if their GitHub profile's public email is an owner's (GitHub only lets a verified address be public), or if GitHub credits their account with commits to the pod's repository made with an owner's email. GitHub only credits an account with commits whose email belongs to it, so this works with a hidden email too, and it's what matches most authors with no setup: checked against live data, it accepts `onevcat` for Kingfisher and Jon Shier for Alamofire, and rejects anyone else. For owners whose trunk email isn't linked to their GitHub account, controlling what the owners published also counts: the repository's GitHub account, public membership of the organization that owns it, a `.zorvok-owners` file in it, or `/.well-known/zorvok-owners` on the homepage's site (for binary-only pods). If nothing matches, the rejection lists exactly which of these would work for that pod.
+- **OWNERS edits** are published when a current owner makes them and at least one owner remains — `pod trunk add-owner`/`remove-owner`, as a pull request. Anything else, an OWNERS file without a version, or a change outside `Specs/`, is rejected.
+- **`prepare_command`** is rejected, as CocoaPods trunk does.
+- **Infrastructure failures** don't wait for a person either. If the index can't be pushed after a merge, the workflow starts `regenerate-index.yml` itself (a `workflow_dispatch` from its token does start a run). If the check fails unexpectedly, the verdict is a rejection that says to run `trunk push` again.
+
+A rejected pull request is closed, since no one would review it; the next `trunk push` opens a fresh one. `trunk push` (v0.1.2) needed no change: it already reported published and rejected verdicts, and simply never sees `needs-review` any more.
