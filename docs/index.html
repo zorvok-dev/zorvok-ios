@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zorvok: CocoaPods-compatible dependency manager for iOS</title>
+<meta name="description" content="Zorvok runs on top of CocoaPods: same Podfile, same pod install results, plus one-command pod publishing to a free public registry after CocoaPods trunk goes read-only on December 2, 2026.">
+<link rel="canonical" href="https://zorvok-dev.github.io/zorvok-ios/">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#141833">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Zorvok">
+<meta property="og:title" content="Zorvok: CocoaPods-compatible dependency manager for iOS">
+<meta property="og:description" content="Same Podfile, same pod install results, and one-command publishing after CocoaPods trunk goes read-only.">
+<meta property="og:url" content="https://zorvok-dev.github.io/zorvok-ios/">
+<meta property="og:image" content="https://zorvok-dev.github.io/zorvok-ios/assets/zorvok-cover.png">
+<meta property="og:image:width" content="1400">
+<meta property="og:image:height" content="788">
+<meta property="og:image:alt" content="Zorvok: a terminal shows zorvok install and zorvok trunk push publishing a pod.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Zorvok: CocoaPods-compatible dependency manager for iOS">
+<meta name="twitter:description" content="Same Podfile, same pod install results, and one-command publishing after CocoaPods trunk goes read-only.">
+<meta name="twitter:image" content="https://zorvok-dev.github.io/zorvok-ios/assets/zorvok-cover.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Zorvok",
+      "alternateName": "zorvok-ios",
+      "description": "A CocoaPods-compatible dependency manager for iOS. zorvok install runs pod install (same Podfile, byte-identical Podfile.lock); zorvok trunk push publishes pods to a free public registry, which keeps working after CocoaPods trunk becomes read-only on December 2, 2026.",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS",
+      "url": "https://zorvok-dev.github.io/zorvok-ios/",
+      "downloadUrl": "https://github.com/zorvok-dev/homebrew-tap",
+      "license": "https://opensource.org/licenses/MIT",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "sameAs": [
+        "https://github.com/zorvok-dev/zorvok-ios",
+        "https://github.com/zorvok-dev/zorvok-specs",
+        "https://github.com/zorvok-dev/homebrew-tap"
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": "Is Zorvok a replacement for CocoaPods?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Zorvok runs CocoaPods underneath: zorvok install calls the real pod install, so dependency resolution, Podfile.lock and Xcode integration are CocoaPods' own. Zorvok adds registries, publishing and safety checks on top." } },
+        { "@type": "Question", "name": "What happens to my app when CocoaPods trunk goes read-only?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Existing pods keep installing; the CocoaPods maintainers' plan keeps existing builds working. What stops on December 2, 2026 is publishing new pods and new versions to trunk. Zorvok gives those new versions a place to go." } },
+        { "@type": "Question", "name": "How do I keep publishing a pod that is already on CocoaPods trunk?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Run zorvok trunk push in the pod's repository. Because the name exists on trunk, you need to be one of its owners there, which Zorvok checks automatically. Users then add :source => 'https://raw.githubusercontent.com/zorvok-dev/zorvok-specs/main/' to that pod's line in their Podfile." } },
+        { "@type": "Question", "name": "Do I have to change my Podfile to use Zorvok?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. zorvok install works with your existing Podfile. To get a pod from Zorvok's registry, either pin it with one :source on its line or use zorvok install --native with the registry configured." } },
+        { "@type": "Question", "name": "Can I go back to pod install?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes, at any time. Zorvok writes nothing CocoaPods doesn't understand." } },
+        { "@type": "Question", "name": "Is Zorvok free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Zorvok is open source under the MIT license, and publishing to its public registry is free; it needs only a GitHub account." } }
+      ]
+    }
+  ]
+}
+</script>
+
+<style>
+  :root {
+    --ink: #141833; --text: #3b4063; --muted: #6b7091; --line: #e3e6f3; --bg: #f7f8fc; --card: #ffffff;
+    --brand: #4f46e5; --brand-soft: #eef0ff; --ok: #067647;
+    --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: var(--text); background: var(--bg); line-height: 1.6; }
+  a { color: var(--brand); }
+  code { font-family: var(--mono); font-size: 0.92em; background: var(--brand-soft); color: #3730a3; padding: 1px 6px; border-radius: 6px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  header.hero { color: #e8eaf6; background:
+      radial-gradient(800px 500px at 85% 0%, rgba(99, 102, 241, 0.35), transparent 60%),
+      radial-gradient(600px 400px at 0% 100%, rgba(236, 72, 153, 0.2), transparent 60%),
+      linear-gradient(160deg, #141833 0%, #0b0d1c 100%); }
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+  .logo { display: flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; font-weight: 700; font-size: 20px; }
+  .logo svg { width: 32px; height: 32px; }
+  nav .links a { color: #c7cbea; text-decoration: none; margin-left: 22px; font-size: 15px; }
+  nav .links a:hover { color: #fff; }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; align-items: center; padding: 48px 0 84px; }
+  h1 { color: #fff; font-size: clamp(34px, 5vw, 52px); line-height: 1.08; letter-spacing: -1px; margin: 0; }
+  h1 em { font-style: normal; background: linear-gradient(90deg, #a5b4fc, #f0abfc); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lede { font-size: 19px; color: #b6bbdc; margin: 20px 0 28px; }
+  .install { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cmd { display: inline-flex; align-items: center; gap: 12px; padding: 12px 14px 12px 18px; border-radius: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); font-family: var(--mono); font-size: 16px; color: #fff; }
+  .cmd b { color: #f0abfc; font-weight: 600; }
+  .cmd button { font: inherit; font-family: -apple-system, sans-serif; font-size: 13px; color: #e8eaf6; background: rgba(255,255,255,0.12); border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  .cta { color: #fff; text-decoration: none; font-weight: 600; padding: 12px 18px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.25); }
+  .term { border-radius: 16px; overflow: hidden; background: rgba(10, 12, 26, 0.92); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 30px 80px rgba(0,0,0,0.5); }
+  .bar { display: flex; gap: 7px; padding: 12px 16px; background: rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .bar i { width: 11px; height: 11px; border-radius: 50%; display: block; background: #ff5f57; }
+  .bar i:nth-child(2) { background: #febc2e; } .bar i:nth-child(3) { background: #28c840; }
+  .term pre { margin: 0; padding: 20px 22px; font-family: var(--mono); font-size: 13.5px; line-height: 1.75; color: #e8eaf6; overflow-x: auto; }
+  .p { color: #8a90b8; } .c { color: #fff; font-weight: 600; } .a { color: #67e8f9; } .ok { color: #4ade80; }
+
+  .notice { margin: -34px auto 0; position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 22px; box-shadow: 0 10px 30px rgba(20,24,51,0.08); font-size: 16.5px; }
+  .notice strong { color: var(--ink); }
+
+  section { padding: 64px 0 8px; }
+  h2 { color: var(--ink); font-size: clamp(26px, 3.4vw, 34px); letter-spacing: -0.5px; margin: 0 0 10px; }
+  .sub { color: var(--muted); font-size: 18px; margin: 0 0 28px; max-width: 760px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+  .card h3 { color: var(--ink); font-size: 18px; margin: 0 0 6px; }
+  .card p { margin: 0; font-size: 15.5px; }
+  pre.code { background: #0f1222; color: #e8eaf6; border-radius: 14px; padding: 18px 20px; font-family: var(--mono); font-size: 14.5px; line-height: 1.7; overflow-x: auto; margin: 0 0 16px; }
+  pre.code .cm { color: #8a90b8; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  ol.steps { padding-left: 20px; margin: 0; }
+  ol.steps li { margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; font-size: 15.5px; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--ink); background: #f1f2fb; font-size: 14px; letter-spacing: 0.3px; }
+  tr:last-child td { border-bottom: 0; }
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; margin-bottom: 12px; }
+  summary { cursor: pointer; color: var(--ink); font-weight: 650; font-size: 17px; }
+  details p { margin: 10px 0 0; }
+  footer { margin-top: 72px; padding: 36px 0 48px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14.5px; }
+  footer a { color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .hero-grid, .two { grid-template-columns: 1fr; }
+    .grid { grid-template-columns: 1fr; }
+    nav .links a:not(.gh) { display: none; }
+    .notice { margin-top: -24px; }
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <nav>
+      <a class="logo" href="./" aria-label="Zorvok home">
+        <svg viewBox="0 0 52 52" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#818cf8"/><stop offset="1" stop-color="#e879f9"/></linearGradient></defs><rect x="2" y="2" width="48" height="48" rx="13" fill="url(#g)"/><path d="M16 17 H36 L17 35 H37" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Zorvok
+      </a>
+      <div class="links">
+        <a href="#quick-start">Quick start</a>
+        <a href="#publish">Publish a pod</a>
+        <a href="#faq">FAQ</a>
+        <a class="gh" href="https://github.com/zorvok-dev/zorvok-ios">GitHub</a>
+      </div>
+    </nav>
+    <div class="hero-grid">
+      <div>
+        <h1>The CocoaPods-compatible dependency manager for iOS. <em>Publish pods in one command.</em></h1>
+        <p class="lede">Zorvok runs on top of CocoaPods: same Podfile, same <code style="background:rgba(255,255,255,.1);color:#fff">pod install</code> results. It adds one-command publishing to a free public registry, which keeps working after CocoaPods trunk goes read-only.</p>
+        <div class="install">
+          <span class="cmd"><b>$</b> <span id="brew">brew install zorvok-dev/tap/zorvok</span> <button type="button" onclick="copyInstall(this)">Copy</button></span>
+          <a class="cta" href="https://github.com/zorvok-dev/zorvok-ios">View on GitHub</a>
+        </div>
+      </div>
+      <div class="term" aria-label="Terminal example">
+        <div class="bar"><i></i><i></i><i></i></div>
+<pre><span class="p">$</span> <span class="c">zorvok install</span>
+Analyzing dependencies
+Downloading dependencies
+<span class="ok">Zorvok install complete! There are 12 dependencies
+from the Podfile and 31 total pods installed.</span>
+
+<span class="p">$</span> <span class="c">zorvok trunk push</span>
+<span class="a">-&gt;</span> Linting MyPod.podspec
+<span class="a">-&gt;</span> Publishing MyPod 2.1.0 to Zorvok's public registry
+<span class="a">-&gt;</span> Waiting for the registry to accept it
+<span class="ok">Published MyPod 2.1.0 to Zorvok's public registry.</span></pre>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="notice"><strong>CocoaPods trunk becomes read-only on December 2, 2026.</strong> Existing pods keep installing, but trunk stops accepting new pods and new versions (<a href="https://blog.cocoapods.org/CocoaPods-Specs-Repo/">CocoaPods' Trunk Read-only Plan</a>). Zorvok gives those new versions a place to go, without changing how your app installs its pods.</p>
+
+  <section id="why">
+    <h2>Why teams use Zorvok</h2>
+    <p class="sub">It keeps CocoaPods, keeps your Podfile, and fills the gaps CocoaPods leaves.</p>
+    <div class="grid">
+      <div class="card"><h3>Drop-in for pod install</h3><p>Same Podfile, same <code>Pods/</code>, byte-identical <code>Podfile.lock</code>. You can go back to <code>pod install</code> at any time.</p></div>
+      <div class="card"><h3>One-command publishing</h3><p><code>zorvok trunk push</code> publishes like <code>pod trunk push</code> did, and the registry accepts it automatically, usually within a minute.</p></div>
+      <div class="card"><h3>Pods stay with their owners</h3><p>A pod that exists on CocoaPods trunk can only be published on Zorvok by its owners there, checked automatically.</p></div>
+      <div class="card"><h3>Private and public pods together</h3><p>Add a company registry without editing your Podfile. If a pod could come from two sources, Zorvok refuses to guess.</p></div>
+      <div class="card"><h3>Every pod command</h3><p><code>zorvok update</code>, <code>outdated</code>, <code>lib lint</code>, <code>spec</code>, <code>deintegrate</code> and the rest map one-to-one.</p></div>
+      <div class="card"><h3>Free and open source</h3><p>MIT licensed. The public registry is a GitHub repository: no server, no fees.</p></div>
+    </div>
+  </section>
+
+  <section id="quick-start">
+    <h2>Quick start</h2>
+    <p class="sub">You need a Mac with Xcode and CocoaPods. Zorvok works with the project you already have.</p>
+<pre class="code"><span class="cm"># one command: adds the tap and trusts only this formula</span>
+brew install zorvok-dev/tap/zorvok
+zorvok doctor              <span class="cm"># checks Ruby, CocoaPods and git</span>
+cd ~/Projects/MyApp        <span class="cm"># any project with a Podfile</span>
+zorvok install             <span class="cm"># runs pod install underneath</span></pre>
+    <p>Open your <code>.xcworkspace</code> as usual. Update Zorvok later with <code>brew upgrade zorvok</code>.</p>
+  </section>
+
+  <section id="publish">
+    <h2>Publish a pod after CocoaPods trunk goes read-only</h2>
+    <p class="sub">Only the podspec goes to the registry; your code, frameworks and xcframeworks stay wherever its <code>source</code> points.</p>
+    <div class="two">
+      <div>
+<pre class="code">gh auth login       <span class="cm"># once: publishing uses your GitHub account</span>
+cd ~/Projects/MyPod
+zorvok trunk push</pre>
+        <p>Your users add one line to get it:</p>
+<pre class="code">pod 'MyPod', '~&gt; 2.1', :source =&gt;
+  'https://raw.githubusercontent.com/zorvok-dev/zorvok-specs/main/'</pre>
+      </div>
+      <div>
+        <ol class="steps">
+          <li><strong>Lint and convert.</strong> <code>trunk push</code> checks your podspec and converts it to JSON.</li>
+          <li><strong>Pull request.</strong> It opens one for you, from your fork of the <a href="https://github.com/zorvok-dev/zorvok-specs">public registry</a>.</li>
+          <li><strong>Automatic check.</strong> The version must be new, you must own the pod, a pod already on CocoaPods trunk can only come from its trunk owners, and <code>prepare_command</code> isn't allowed.</li>
+          <li><strong>Published.</strong> Merged and indexed automatically, usually within a minute. If a check fails, <code>trunk push</code> says exactly why.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section id="commands">
+    <h2>From pod to zorvok</h2>
+    <p class="sub">Every <code>pod</code> command has a <code>zorvok</code> equivalent.</p>
+    <table>
+      <tr><th>CocoaPods</th><th>Zorvok</th><th>What it does</th></tr>
+      <tr><td><code>pod install</code></td><td><code>zorvok install</code></td><td>Runs <code>pod install</code>; add <code>--native --source &lt;url&gt;</code> for extra registries</td></tr>
+      <tr><td><code>pod update</code></td><td><code>zorvok update</code></td><td>Runs <code>pod update</code></td></tr>
+      <tr><td><code>pod trunk push</code></td><td><code>zorvok trunk push</code></td><td>Publishes to Zorvok's public registry</td></tr>
+      <tr><td><code>pod lib lint</code></td><td><code>zorvok lib lint</code></td><td>Validates a podspec by building it</td></tr>
+      <tr><td><code>pod repo add-cdn</code></td><td><code>zorvok registry add-cdn</code></td><td>Registers a CDN spec source</td></tr>
+      <tr><td><code>pod outdated</code>, <code>spec</code>, <code>cache</code>, <code>deintegrate</code> …</td><td>Same name under <code>zorvok</code></td><td>Runs the same <code>pod</code> command</td></tr>
+    </table>
+    <p>The <a href="https://github.com/zorvok-dev/zorvok-ios#from-pod-to-zorvok">full command table</a> is in the README.</p>
+  </section>
+
+  <section id="faq">
+    <h2>Frequently asked questions</h2>
+    <details open><summary>Is Zorvok a replacement for CocoaPods?</summary><p>No. Zorvok runs CocoaPods underneath: <code>zorvok install</code> calls the real <code>pod install</code>, so dependency resolution, <code>Podfile.lock</code> and Xcode integration are CocoaPods' own. Zorvok adds registries, publishing and safety checks on top.</p></details>
+    <details><summary>What happens to my app when CocoaPods trunk goes read-only?</summary><p>Existing pods keep installing; the CocoaPods maintainers' plan keeps existing builds working. What stops on December 2, 2026 is publishing new pods and new versions to trunk. Zorvok gives those new versions a place to go.</p></details>
+    <details><summary>How do I keep publishing a pod that's already on CocoaPods trunk?</summary><p>Run <code>zorvok trunk push</code> in the pod's repository. Because the name exists on trunk, you need to be one of its owners there, which Zorvok checks automatically. Users then add <code>:source =&gt; 'https://raw.githubusercontent.com/zorvok-dev/zorvok-specs/main/'</code> to that pod's line in their Podfile.</p></details>
+    <details><summary>Do I have to change my Podfile to use Zorvok?</summary><p>No. <code>zorvok install</code> works with your existing Podfile. To get a pod from Zorvok's registry, either pin it with one <code>:source</code> on its line or use <code>zorvok install --native</code> with the registry configured.</p></details>
+    <details><summary>Can I go back to pod install?</summary><p>Yes, at any time. Zorvok writes nothing CocoaPods doesn't understand.</p></details>
+    <details><summary>Is Zorvok free?</summary><p>Yes. Zorvok is open source under the MIT license, and publishing to its public registry is free; it needs only a GitHub account.</p></details>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><a href="https://github.com/zorvok-dev/zorvok-ios">zorvok-ios</a> (the CLI) · <a href="https://github.com/zorvok-dev/zorvok-specs">zorvok-specs</a> (the public registry) · <a href="https://github.com/zorvok-dev/homebrew-tap">homebrew-tap</a> · <a href="https://github.com/zorvok-dev/zorvok-ios/issues">Report an issue</a></p>
+    <p>MIT licensed. Zorvok is an independent project and isn't affiliated with or endorsed by CocoaPods.</p>
+  </div>
+</footer>
+
+<script>
+  function copyInstall(button) {
+    var text = document.getElementById('brew').textContent;
+    var done = function () { button.textContent = 'Copied'; setTimeout(function () { button.textContent = 'Copy'; }, 1500); };
+    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, function () {}); }
+  }
+</script>
+</body>
+</html>

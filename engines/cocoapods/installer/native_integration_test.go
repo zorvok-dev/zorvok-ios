@@ -117,6 +117,33 @@ func TestInstallNativeMatchesDelegatedInstall(t *testing.T) {
 	}
 }
 
+// TestRealInstallsSayZorvokInstallComplete runs real CocoaPods, both
+// ways, and checks the closing summary is Zorvok's (the counts are still
+// CocoaPods' own) and that CocoaPods' wording no longer appears.
+func TestRealInstallsSayZorvokInstallComplete(t *testing.T) {
+	requirePod(t)
+
+	for name, install := range map[string]func(out, errOut *strings.Builder, dir string) error{
+		"delegated": func(out, errOut *strings.Builder, dir string) error { return Install(out, errOut, dir, nil) },
+		"native":    func(out, errOut *strings.Builder, dir string) error { return InstallNative(out, errOut, dir, nil) },
+	} {
+		root := t.TempDir()
+		copyRel(t, root, "local-pod")
+		copyRel(t, root, "simple-project")
+
+		var out, errOut strings.Builder
+		if err := install(&out, &errOut, filepath.Join(root, "simple-project")); err != nil {
+			t.Fatalf("%s install: %v\n%s", name, err, errOut.String())
+		}
+		if !strings.Contains(out.String(), "Zorvok install complete! There is 1 dependency from the Podfile and 1 total pod installed.") {
+			t.Errorf("%s install output lacks Zorvok's completion summary:\n%s", name, out.String())
+		}
+		if strings.Contains(out.String(), "Pod installation complete!") {
+			t.Errorf("%s install output still says CocoaPods' wording:\n%s", name, out.String())
+		}
+	}
+}
+
 // TestInstallNativeFederatesUndeclaredDependency is the Milestone 6
 // payoff test: resolves a pod that is NOT declared with any :path/:git
 // in the Podfile, and whose source is NOT named by any `source` line in

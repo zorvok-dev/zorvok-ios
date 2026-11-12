@@ -44,6 +44,12 @@ func Run(out, errOut io.Writer, dir string, args ...string) error {
 	cmd.Stdout = out
 	cmd.Stderr = errOut
 	cmd.Stdin = os.Stdin
+	// When out isn't a file (a caller filtering the output, say), `pod`
+	// writes into a pipe, and Ruby would buffer that until exit instead
+	// of streaming progress. CocoaPods' own launcher syncs stdout when
+	// this is set. cmd.Environ(), not os.Environ(), so the PWD exec sets
+	// to match cmd.Dir is kept.
+	cmd.Env = append(cmd.Environ(), "CP_STDOUT_SYNC=TRUE")
 
 	if err := cmd.Run(); err != nil {
 		var exitErr *exec.ExitError

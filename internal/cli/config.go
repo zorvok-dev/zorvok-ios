@@ -11,8 +11,9 @@ import (
 // runConfig implements `zorvok config [get <key> | set <key> <value> | unset <key> | list]`.
 //
 // Like `git config`, settings are project-local (.zorvok.yml in the
-// current directory) by default; pass --global to target
-// ~/.config/zorvok/config.yml instead. With no subcommand (or with
+// current directory) by default; pass --global to target the user
+// config file (~/Library/Application Support/zorvok/config.yml on macOS)
+// instead. With no subcommand (or with
 // `list`), prints the effective settings for that scope: the
 // project-over-global merge normally, or just the global file alone
 // when --global is given — matching `git config --global --list`'s

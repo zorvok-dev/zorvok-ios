@@ -1,0 +1,25 @@
+# Zorvok
+
+> Zorvok is a CocoaPods-compatible dependency manager for iOS. It runs on top of CocoaPods instead of replacing it: `zorvok install` runs `pod install`, with the same Podfile and a byte-identical Podfile.lock. It adds one-command publishing (`zorvok trunk push`) to a free public registry, which keeps working after CocoaPods trunk becomes read-only on December 2, 2026.
+
+Key facts:
+
+- Install: `brew install zorvok-dev/tap/zorvok` (macOS, Homebrew). Requires CocoaPods.
+- Use: `zorvok install` and `zorvok update` in any project with a Podfile; every `pod` command has a `zorvok` equivalent.
+- Publish: `gh auth login` once, then `zorvok trunk push` in the pod's folder. Only the podspec is published; code and xcframeworks stay where the podspec's `source` points. A GitHub Actions check on the public registry accepts or rejects each publish automatically, usually within a minute.
+- Ownership: a pod name already on CocoaPods trunk can only be published on Zorvok by one of its trunk owners, verified automatically against trunk's records.
+- Install a published pod: `pod 'MyPod', :source => 'https://raw.githubusercontent.com/zorvok-dev/zorvok-specs/main/'` in the Podfile (works with plain `pod install` too).
+- Private registries: `zorvok install --native --source <url>` adds a registry without editing the Podfile, and refuses to install a pod found in more than one source unless it's pinned (dependency-confusion protection).
+- License: MIT. Independent project, not affiliated with CocoaPods.
+
+## Docs
+
+- [README](https://github.com/zorvok-dev/zorvok-ios#readme): overview, quick start, publishing, command table, FAQ
+- [Public registry](https://github.com/zorvok-dev/zorvok-specs#readme): how publishing, ownership and the automatic check work
+- [Homebrew tap](https://github.com/zorvok-dev/homebrew-tap): installing, upgrading, uninstalling
+- [Architecture](https://github.com/zorvok-dev/zorvok-ios/blob/main/ARCHITECTURE.md): how Zorvok delegates to CocoaPods
+- [ADR 0010](https://github.com/zorvok-dev/zorvok-ios/blob/main/docs/adr/0010-trunk-push-to-the-public-registry.md): publishing to the public registry
+
+## Optional
+
+- [CocoaPods Trunk Read-only Plan](https://blog.cocoapods.org/CocoaPods-Specs-Repo/): the CocoaPods maintainers' timeline

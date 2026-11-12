@@ -58,6 +58,11 @@
 
 require 'cocoapods'
 
+# Zorvok reads this script's output through a pipe (to say "Zorvok
+# install complete!" at the end), and Ruby buffers a pipe until exit;
+# syncing keeps CocoaPods' progress streaming as it happens.
+$stdout.sync = true
+
 # Overridable via ZORVOK_DEFAULT_SOURCE_URL so the Milestone 6 test
 # suite can verify this fallback hermetically, against a local fixture,
 # instead of depending on real network access to cdn.cocoapods.org.

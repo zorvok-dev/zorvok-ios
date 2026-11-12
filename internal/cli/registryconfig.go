@@ -16,7 +16,8 @@ const defaultRegistryURL = "http://localhost:8080"
 
 // registryURL resolves the effective registry URL the same way
 // `zorvok config` resolves any other setting: project (.zorvok.yml) over
-// global (~/.config/zorvok/config.yml) over the local-dev default.
+// global (~/Library/Application Support/zorvok/config.yml on macOS) over
+// the local-dev default.
 func registryURL() (string, error) {
 	url, _, err := registryURLExplicit()
 	if err != nil {

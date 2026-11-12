@@ -8,6 +8,7 @@ import (
 
 	"github.com/zorvok-dev/zorvok-ios/engines/cocoapods/adapter"
 	"github.com/zorvok-dev/zorvok-ios/engines/cocoapods/installer"
+	"github.com/zorvok-dev/zorvok-ios/internal/publicregistry"
 )
 
 // runInstall implements
@@ -50,7 +51,7 @@ func runInstall(out, errOut io.Writer, args []string) int {
 			if url, explicit, err := registryURLExplicit(); err != nil {
 				return exitErr(errOut, "%v", err)
 			} else if explicit {
-				sources = append(sources, url+"/cdn/")
+				sources = append(sources, federationSource(url))
 			}
 		}
 		if err := installer.InstallNative(out, errOut, cwd, sources); err != nil {
@@ -63,6 +64,17 @@ func runInstall(out, errOut io.Writer, args []string) int {
 		return reportDelegationError(errOut, err)
 	}
 	return 0
+}
+
+// federationSource is the CocoaPods source a configured registry_url is
+// installed from. A Zorvok registry server serves its CDN under /cdn/;
+// the public registry is a CDN itself, at publicregistry.URL, whichever
+// of its addresses registry_url names.
+func federationSource(registryURL string) string {
+	if publicregistry.IsURL(registryURL) {
+		return publicregistry.URL
+	}
+	return registryURL + "/cdn/"
 }
 
 // parseInstallArgs splits out --native, --source <url> (repeatable), and

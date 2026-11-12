@@ -81,3 +81,23 @@ func TestNativeInstallRejectsUnsupportedFlags(t *testing.T) {
 		t.Fatalf("expected the error to name the unsupported flag, got %q", errOut)
 	}
 }
+
+// TestFederationSource proves a registry_url naming the public registry,
+// in any of its spellings, installs from the public registry itself,
+// while a registry server's is reached under /cdn/. Before this, the
+// README's own "configure the public registry once" setup appended /cdn/
+// to the public registry's URL, which doesn't exist.
+func TestFederationSource(t *testing.T) {
+	for _, configured := range []string{
+		"https://raw.githubusercontent.com/zorvok-dev/zorvok-specs/main",
+		"https://github.com/zorvok-dev/zorvok-specs",
+		"https://zorvok-dev.github.io/zorvok-specs",
+	} {
+		if got := federationSource(configured); got != "https://raw.githubusercontent.com/zorvok-dev/zorvok-specs/main/" {
+			t.Errorf("federationSource(%q) = %q, want the public registry's own URL", configured, got)
+		}
+	}
+	if got := federationSource("https://pods.example.com"); got != "https://pods.example.com/cdn/" {
+		t.Errorf("federationSource(registry server) = %q, want its /cdn/ endpoint", got)
+	}
+}

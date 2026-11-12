@@ -40,5 +40,10 @@ func InstallNative(out, errOut io.Writer, dir string, extraSources []string) err
 		return fmt.Errorf("resolve project directory: %w", err)
 	}
 	args := append([]string{absDir}, extraSources...)
-	return adapter.RunRubyScript(out, errOut, absDir, nativeInstallScript, args...)
+	branded := newBrandedOutput(out, "Zorvok install complete!")
+	err = adapter.RunRubyScript(branded, errOut, absDir, nativeInstallScript, args...)
+	if flushErr := branded.Flush(); err == nil {
+		err = flushErr
+	}
+	return err
 }

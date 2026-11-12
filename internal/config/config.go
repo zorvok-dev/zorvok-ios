@@ -1,5 +1,6 @@
-// Package config manages Zorvok's global (~/.config/zorvok) and
-// per-project (.zorvok.yml) configuration files.
+// Package config manages Zorvok's global configuration (the user config
+// directory: ~/Library/Application Support/zorvok on macOS, or
+// ZORVOK_CONFIG_DIR) and per-project (.zorvok.yml) configuration files.
 package config
 
 import (
