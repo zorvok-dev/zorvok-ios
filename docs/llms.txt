@@ -1,6 +1,6 @@
 # Zorvok
 
-> Zorvok is a CocoaPods-compatible dependency manager for iOS. It runs on top of CocoaPods instead of replacing it: `zorvok install` runs `pod install`, with the same Podfile and a byte-identical Podfile.lock. It adds one-command publishing (`zorvok trunk push`) to a free public registry, which keeps working after CocoaPods trunk becomes read-only on December 2, 2026.
+> Zorvok (ZORVOK: Zero Overhead, Reliable Versions, One Kit) is a CocoaPods-compatible dependency manager for iOS. It runs on top of CocoaPods instead of replacing it: `zorvok install` runs `pod install`, with the same Podfile and a byte-identical Podfile.lock. It adds one-command publishing (`zorvok trunk push`) to a free public registry, which keeps working after CocoaPods trunk becomes read-only on December 2, 2026.
 
 Key facts:
 

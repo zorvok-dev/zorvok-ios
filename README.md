@@ -4,6 +4,8 @@
 
 # Zorvok: a CocoaPods-compatible dependency manager for iOS
 
+*ZORVOK: Zero Overhead, Reliable Versions, One Kit.*
+
 **Keep your Podfile. Keep `pod install`'s results. Keep publishing pods after CocoaPods trunk goes read-only.**
 
 Zorvok runs on top of CocoaPods instead of replacing it: `zorvok install` gives you the same `Pods/` folder and a byte-identical `Podfile.lock`. On top, it adds what CocoaPods doesn't have: one-command publishing to a free public registry, private registries without Podfile edits, and protection against dependency confusion.
@@ -88,7 +90,7 @@ Use it with: pod 'MyPod', :source => 'https://raw.githubusercontent.com/zorvok-d
 The public registry has no server, so GitHub does the job trunk.cocoapods.org does for CocoaPods. `trunk push` commits the podspec's JSON to your fork of the registry and opens a pull request. The registry's publish check then accepts or rejects it automatically, and nobody reviews anything by hand. It checks that:
 
 - the version is new, since published versions never change;
-- you own the pod (a new name's first publisher becomes its owner);
+- you own the pod: your GitHub account is in its `OWNERS` file, by its numeric user ID, which can't be renamed or reused (a new name's first publisher becomes its owner);
 - if the name already exists on CocoaPods trunk, you're one of its owners there. That's usually matched through the email you registered with `pod trunk register`; if it can't match you, `trunk push` says exactly how to prove it;
 - the podspec is valid and doesn't use `prepare_command`.
 
@@ -151,6 +153,9 @@ Run `zorvok --help` for the full list, or `zorvok <command> --help` for any comm
 
 ## FAQ
 
+**What does Zorvok stand for?**
+ZORVOK is short for Zero Overhead, Reliable Versions, One Kit: no new Podfile format or workflow to learn, versions that never change once published, and one tool for installing and publishing pods.
+
 **Is Zorvok a replacement for CocoaPods?**
 No. Zorvok runs CocoaPods underneath: `zorvok install` calls the real `pod install`, so dependency resolution, `Podfile.lock` and Xcode integration are all CocoaPods' own code. Zorvok adds registries, publishing and safety checks on top.
 
@@ -189,11 +194,15 @@ Zorvok can resolve pods from any mix of three kinds of registry, all speaking Co
 
 Design details: [ARCHITECTURE.md](ARCHITECTURE.md) and the decision records in [docs/adr/](docs/adr/). [ADR 0010](docs/adr/0010-trunk-push-to-the-public-registry.md) covers publishing to the public registry.
 
+## Security
+
+Report a vulnerability privately from the repository's **Security** tab ([SECURITY.md](SECURITY.md)). [SECURITY-REVIEW.md](SECURITY-REVIEW.md) is our latest security review: what was checked and how, every issue found, how each was fixed, and the risks that remain.
+
 ## Status and known gaps
 
 Zorvok is young; [ROADMAP.md](ROADMAP.md) has the full status.
 
-- The public registry's publish workflow hasn't run on GitHub Actions yet. Its scripts are tested locally, and its script has run end to end against a local git repository with live CocoaPods trunk and GitHub data; the first real publish is the remaining check.
+- The public registry's publish workflow hasn't run on GitHub Actions yet. Its rules are tested locally, and `scripts/test-publish-workflow.sh` in zorvok-specs runs the workflow's own script end to end against a local git repository with live CocoaPods trunk and GitHub data; the first real publish is the remaining check.
 - Installing from the public registry while it has no pods yet occasionally fails with `Response: 501` from raw.githubusercontent.com. Running the command again works.
 - The self-hosted registry server stores data in memory only and logs email verification links instead of sending them.
 - On a registry server, a name belongs to its first publisher, with no reserved-name policy. The public registry additionally keeps names that exist on CocoaPods trunk with their trunk owners.
