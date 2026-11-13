@@ -3,6 +3,8 @@ package registry
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -262,5 +264,26 @@ func TestSearch(t *testing.T) {
 	}
 	if len(all) != 2 {
 		t.Fatalf("expected 2 results for an empty query, got %d", len(all))
+	}
+}
+
+// TestAPIErrorMessageCantDriveTheTerminal proves a server's error text,
+// which the CLI prints as-is, reaches it without escape sequences or
+// bidirectional-text controls.
+func TestAPIErrorMessageCantDriveTheTerminal(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"error": "not allowed\u001b]8;;https://evil.example\u0007here\u202e"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	_, err := NewClient(srv.URL).Me(context.Background(), "tok")
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("err = %v, want an APIError", err)
+	}
+	if apiErr.Message != "not allowed]8;;https://evil.examplehere" {
+		t.Fatalf("message = %q, want it without control characters", apiErr.Message)
 	}
 }

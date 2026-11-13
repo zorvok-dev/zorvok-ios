@@ -11,8 +11,8 @@
 // commits the entry to a branch of the publisher's own fork and opens a
 // pull request, and the registry's publish workflow — the only thing
 // with write access to it — checks that pull request against the same
-// rules a server would enforce, merges it itself, and comments a
-// verdict, which WaitForVerdict reports back.
+// rules a server would enforce, adds its files to the registry itself,
+// and comments a verdict, which WaitForVerdict reports back.
 package publicregistry
 
 import (
@@ -32,7 +32,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
+
+	"github.com/zorvok-dev/zorvok-ios/internal/safehttp"
 )
 
 // Repo is the public registry's GitHub repository.
@@ -114,7 +115,7 @@ func NewClient(apiURL, token string) *Client {
 	return &Client{
 		apiURL:        strings.TrimRight(apiURL, "/"),
 		token:         token,
-		http:          &http.Client{Timeout: 30 * time.Second},
+		http:          safehttp.NewClient(30 * time.Second),
 		retryInterval: 2 * time.Second,
 		retryAttempts: 30,
 		pollInterval:  5 * time.Second,
@@ -179,7 +180,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 			Message string `json:"message"`
 		}
 		_ = json.Unmarshal(data, &apiErr)
-		return &APIError{StatusCode: resp.StatusCode, Message: apiErr.Message}
+		return &APIError{StatusCode: resp.StatusCode, Message: safehttp.Printable(apiErr.Message)}
 	}
 	if out != nil && len(data) > 0 {
 		if err := json.Unmarshal(data, out); err != nil {
@@ -260,7 +261,6 @@ type pullRequest struct {
 	Number  int    `json:"number"`
 	HTMLURL string `json:"html_url"`
 	State   string `json:"state"`
-	Merged  bool   `json:"merged"`
 }
 
 // Publish adds spec to the public registry as user. It first checks the
@@ -611,17 +611,16 @@ func (c *Client) verdict(ctx context.Context, sub *Submission) (Verdict, error) 
 		return *found, nil
 	}
 
-	// No verdict comment yet — but a pull request a maintainer merged by
-	// hand is published all the same.
+	// No verdict yet. Only the workflow's verdict means published: the
+	// workflow publishes a pull request's files, never its commits, so
+	// GitHub's "merged" flag says nothing about whether it was checked.
+	// A pull request closed with no verdict won't get one.
 	var pr pullRequest
 	if err := c.do(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/pulls/%d", Repo, sub.Number), nil, &pr); err != nil {
 		return Verdict{}, err
 	}
-	switch {
-	case pr.Merged:
-		return Verdict{Outcome: Published}, nil
-	case pr.State == "closed":
-		return Verdict{Outcome: Rejected, Details: "The pull request was closed without being merged."}, nil
+	if pr.State == "closed" {
+		return Verdict{Outcome: Rejected, Details: "The pull request was closed before the registry's check gave a verdict."}, nil
 	}
 	return Verdict{Outcome: Pending}, nil
 }
@@ -631,20 +630,12 @@ func (c *Client) verdict(ctx context.Context, sub *Submission) (Verdict, error) 
 const rejectedHeading = "This can't be published:"
 
 // verdictDetails turns the text of a verdict comment, after its marker,
-// into something safe to print in a terminal. The reasons can quote a
-// pull request or CocoaPods trunk, so control characters (which could
-// drive the terminal) and bidirectional-text controls (which could make
-// them read differently from what they say) are dropped. The workflow's
+// into something safe to print in a terminal: the reasons can quote a
+// pull request or CocoaPods trunk (safehttp.Printable). The workflow's
 // heading and the indent it quotes reasons with are removed too, since
 // `trunk push` prints its own.
 func verdictDetails(text string) string {
-	text = strings.Map(func(r rune) rune {
-		if r != '\n' && r != '\t' && (unicode.IsControl(r) || unicode.Is(unicode.Bidi_Control, r)) {
-			return -1
-		}
-		return r
-	}, text)
-	lines := strings.Split(strings.TrimSpace(text), "\n")
+	lines := strings.Split(strings.TrimSpace(safehttp.Printable(text)), "\n")
 	if lines[0] == rejectedHeading {
 		lines = lines[1:]
 	}

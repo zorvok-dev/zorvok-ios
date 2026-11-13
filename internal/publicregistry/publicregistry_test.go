@@ -215,8 +215,8 @@ func TestPublishAndWaitForTheWorkflowToMergeIt(t *testing.T) {
 	if v.Outcome != Published {
 		t.Fatalf("outcome = %q, want %q", v.Outcome, Published)
 	}
-	if !f.Pulls()[0].Merged {
-		t.Error("pull request wasn't merged")
+	if f.Pulls()[0].State != "closed" {
+		t.Error("the workflow didn't close the pull request")
 	}
 }
 
@@ -290,10 +290,12 @@ func TestWaitForVerdictReportsPendingWhenNothingArrivesInTime(t *testing.T) {
 	}
 }
 
-// TestWaitForVerdictCountsAPullRequestMergedByHandAsPublished covers a
-// maintainer merging after a review, before (or without) a verdict
-// comment on that commit.
-func TestWaitForVerdictCountsAPullRequestMergedByHandAsPublished(t *testing.T) {
+// TestWaitForVerdictDoesNotTrustAMergedFlag proves only the workflow's
+// verdict means published. GitHub marks a pull request merged whenever
+// its head becomes part of the registry's history, which says nothing
+// about whether anything was checked, so a pull request that's merged or
+// closed without a verdict is reported as not published.
+func TestWaitForVerdictDoesNotTrustAMergedFlag(t *testing.T) {
 	f := githubtest.New(t, "alice")
 	c := newTestClient(f)
 	sub, err := c.Publish(context.Background(), alice, myPod("1.0.0"))
@@ -303,8 +305,8 @@ func TestWaitForVerdictCountsAPullRequestMergedByHandAsPublished(t *testing.T) {
 	f.MergePull(sub.Number)
 
 	v, err := c.WaitForVerdict(context.Background(), sub, time.Second)
-	if err != nil || v.Outcome != Published {
-		t.Fatalf("verdict = %+v, err = %v, want Published", v, err)
+	if err != nil || v.Outcome != Rejected || !strings.Contains(v.Details, "before the registry's check gave a verdict") {
+		t.Fatalf("verdict = %+v, err = %v, want Rejected for want of a verdict", v, err)
 	}
 }
 

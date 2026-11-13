@@ -111,7 +111,8 @@ func (f *Fake) DelayFork(n int) {
 
 // ActAsPublishWorkflow makes the fake judge every new head of an open
 // pull request the way the registry's publish workflow does: comment
-// verdict (with details) on it, and merge it if verdict is "published".
+// verdict (with details) on it, then close it. The workflow publishes a
+// pull request's files, not its commits, so it never shows as merged.
 func (f *Fake) ActAsPublishWorkflow(verdict, details string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -402,9 +403,7 @@ func (f *Fake) judge(pr *PullRequest) {
 		return
 	}
 	f.comments[pr.Number] = append(f.comments[pr.Number], Comment{User: BotLogin, Body: VerdictComment(head, f.verdict, f.verdictDetails)})
-	if f.verdict == "published" {
-		pr.Merged, pr.State = true, "closed"
-	}
+	pr.State = "closed"
 }
 
 func (f *Fake) pull(number int) *PullRequest {

@@ -2,12 +2,12 @@ package cli
 
 import (
 	"fmt"
-	"net"
 	"net/url"
 	"os"
 	"strings"
 
 	"github.com/zorvok-dev/zorvok-ios/internal/config"
+	"github.com/zorvok-dev/zorvok-ios/internal/safehttp"
 )
 
 // checkTokenURL refuses to send a token, or an account's sign-up, to u
@@ -16,17 +16,8 @@ import (
 // fake), where nobody else is on the path. what names the setting u came
 // from, for the error.
 func checkTokenURL(what, u string) error {
-	parsed, err := url.Parse(u)
-	if err == nil && parsed.Host != "" {
-		switch strings.ToLower(parsed.Scheme) {
-		case "https":
-			return nil
-		case "http":
-			host := strings.ToLower(parsed.Hostname())
-			if ip := net.ParseIP(host); host == "localhost" || (ip != nil && ip.IsLoopback()) {
-				return nil
-			}
-		}
+	if parsed, err := url.Parse(u); err == nil && safehttp.SecureURL(parsed) {
+		return nil
 	}
 	return fmt.Errorf("%s %q must be an https URL, since your login is sent to it (plain http is allowed only to this machine, like %s)", what, u, defaultRegistryURL)
 }

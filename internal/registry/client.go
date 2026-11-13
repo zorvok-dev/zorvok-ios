@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/zorvok-dev/zorvok-ios/internal/safehttp"
 )
 
 // Client talks to one Zorvok registry's HTTP API.
@@ -25,7 +27,7 @@ type Client struct {
 func NewClient(baseURL string) *Client {
 	return &Client{
 		BaseURL: strings.TrimSuffix(baseURL, "/"),
-		HTTP:    &http.Client{Timeout: 30 * time.Second},
+		HTTP:    safehttp.NewClient(30 * time.Second),
 	}
 }
 
@@ -231,7 +233,8 @@ func (c *Client) do(ctx context.Context, method, path, sessionToken string, body
 			}
 			message = msg
 		}
-		return &APIError{StatusCode: resp.StatusCode, Message: message}
+		// Printed as-is by the CLI, so nothing in it may drive the terminal.
+		return &APIError{StatusCode: resp.StatusCode, Message: safehttp.Printable(message)}
 	}
 
 	if out != nil {
