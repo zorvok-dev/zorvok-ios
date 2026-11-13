@@ -1,6 +1,6 @@
 # Zorvok security review, November 2026
 
-**Result:** two rounds of review found 27 issues. Every High and Medium one is fixed and covered by a test. Scans of all four repositories found no known-vulnerable dependencies and no secrets in any commit. The risks that remain are listed under [What's left](#whats-left) instead of being left out.
+**Result:** two rounds of review found 27 issues. Every High and Medium one is fixed and covered by a test. Scans of all four repositories found no known-vulnerable dependencies and no real secrets in any commit. The risks that remain are listed under [What's left](#whats-left) instead of being left out.
 
 **What kind of review this is:** the Zorvok team reviewed its own code with standard open-source security scanners, plus an independent AI-assisted review that was given only the code and asked to break it. After the fixes, a second, fresh review attacked them and found more, which are fixed too. **This is not a paid third-party audit.** We publish it so you can check our work: every tool and test below can be re-run with the commands at the end.
 
@@ -45,14 +45,14 @@ Go 1.27.4 on macOS. The registry's scripts were tested on bash 5.3, the shell Gi
 | Scan | zorvok-ios | zorvok-specs | homebrew-tap | zorvok-registry-ios |
 |---|---|---|---|---|
 | govulncheck | No vulnerabilities | n/a | n/a | No vulnerabilities |
-| gitleaks, full history | No leaks | No leaks | No leaks | No leaks |
+| gitleaks, full history | No real secrets: 2 fake test tokens (below) | No leaks | No leaks | No leaks |
 | gitleaks, working tree | No leaks | No leaks | No leaks | No leaks |
 | shellcheck | n/a | Clean | Clean | n/a |
 | actionlint | n/a | Clean | n/a | n/a |
 | zizmor | n/a | No findings (3 deliberate, explained below) | n/a | n/a |
 | gosec | 25 reports, none exploitable (below) | n/a | n/a | 3 reports, 2 fixed (below) |
 
-Two lines in the CLI's tests are fake tokens that look real (fixtures for token handling). They're marked `gitleaks:allow` with a note saying so.
+Two lines in the CLI's tests hold the fake token `abcdef123456` (a fixture for token handling), which gitleaks's generic key rule flags. They're marked `gitleaks:allow` in the current code, and the two older commits that had them unmarked are listed in `.gitleaksignore` with the reason, so `gitleaks git .` passes cleanly.
 
 **gosec, zorvok-ios (25).** Each was read and none is exploitable.
 - 6 × G204, a subprocess run with variable arguments. The CLI's job is running `pod`, `ruby` and `gh`. It runs them with argument lists, never through a shell, so arguments can't be split or reinterpreted.

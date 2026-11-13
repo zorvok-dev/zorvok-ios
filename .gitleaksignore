@@ -1,0 +1,4 @@
+# Older versions of a test, before the gitleaks:allow markers on those
+# lines: the fake fixture token "abcdef123456", not a secret.
+2e8c7aeb55fee65de1d4b11c247c05aa8e4d45b5:internal/auth/auth_test.go:generic-api-key:57
+1bba544764676dc48360d35ece5c6fd5290667c0:internal/auth/auth_test.go:generic-api-key:27
