@@ -69,11 +69,11 @@ var publishWaitTimeout = 10 * time.Minute
 
 // githubAPIURL is GitHub's REST API, overridable via
 // ZORVOK_GITHUB_API_URL so tests can stand a local fake in for it.
-func githubAPIURL() string {
+func githubAPIURL() (string, error) {
 	if v := os.Getenv("ZORVOK_GITHUB_API_URL"); v != "" {
-		return v
+		return v, checkTokenURL("ZORVOK_GITHUB_API_URL", v)
 	}
-	return publicregistry.DefaultAPIURL
+	return publicregistry.DefaultAPIURL, nil
 }
 
 // pushToPublicRegistry publishes to Zorvok's public registry in one
@@ -81,14 +81,18 @@ func githubAPIURL() string {
 // once the registry has accepted the podspec, or said why it hasn't.
 func pushToPublicRegistry(out, errOut io.Writer, dir string, opts publisher.Options) int {
 	ctx := context.Background()
+	apiURL, err := githubAPIURL()
+	if err != nil {
+		return exitErr(errOut, "%v", err)
+	}
 	token, err := publicregistry.Token()
 	if err != nil {
 		return exitErr(errOut, "%v", err)
 	}
-	client := publicregistry.NewClient(githubAPIURL(), token)
+	client := publicregistry.NewClient(apiURL, token)
 	// Checked before linting, which can take minutes, so a missing or
 	// expired GitHub login fails right away.
-	login, err := client.Login(ctx)
+	user, err := client.User(ctx)
 	if err != nil {
 		return exitErr(errOut, "%v", err)
 	}
@@ -98,8 +102,8 @@ func pushToPublicRegistry(out, errOut io.Writer, dir string, opts publisher.Opti
 		return exitErr(errOut, "%v", err)
 	}
 
-	fmt.Fprintf(out, "-> Publishing %s %s to Zorvok's public registry as %s\n", p.Name, p.Version, login)
-	sub, err := client.Publish(ctx, login, publicregistry.Spec{Name: p.Name, Version: p.Version, JSON: p.JSON, Source: p.SourceSummary()})
+	fmt.Fprintf(out, "-> Publishing %s %s to Zorvok's public registry as %s\n", p.Name, p.Version, user.Login)
+	sub, err := client.Publish(ctx, user, publicregistry.Spec{Name: p.Name, Version: p.Version, JSON: p.JSON, Source: p.SourceSummary()})
 	if err != nil {
 		return exitErr(errOut, "%v", err)
 	}

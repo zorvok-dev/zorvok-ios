@@ -28,7 +28,11 @@ const (
 // BotLogin is the account the registry's publish workflow comments as.
 const BotLogin = "github-actions[bot]"
 
-// Fake is one fake GitHub, on which Login is signed in.
+// UserID is the GitHub user ID of the account every Fake is signed in as.
+const UserID = 1001
+
+// Fake is one fake GitHub, on which Login (GitHub user UserID) is signed
+// in.
 type Fake struct {
 	// URL is the fake API's base URL; Token is the only token it accepts.
 	URL   string
@@ -209,7 +213,7 @@ func (f *Fake) serve(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case r.Method == http.MethodGet && path == "/user":
-		reply(w, http.StatusOK, map[string]string{"login": f.Login})
+		reply(w, http.StatusOK, map[string]any{"login": f.Login, "id": UserID})
 
 	case r.Method == http.MethodGet && path == up:
 		reply(w, http.StatusOK, map[string]string{"full_name": upstream, "default_branch": "main"})

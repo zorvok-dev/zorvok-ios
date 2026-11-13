@@ -99,8 +99,8 @@ func TestTrunkPushPublishesToThePublicRegistryByDefault(t *testing.T) {
 	if spec := files["Specs/MyPod/1.0.0/MyPod.podspec.json"]; !strings.Contains(spec, `"name": "MyPod"`) || !strings.Contains(spec, `"tag": "1.0.0"`) {
 		t.Errorf("committed podspec JSON isn't pod ipc spec's output for MyPod.podspec:\n%s", spec)
 	}
-	if owners := files["Specs/MyPod/OWNERS"]; owners != "alice\n" {
-		t.Errorf("OWNERS = %q, want %q", owners, "alice\n")
+	if owners := files["Specs/MyPod/OWNERS"]; owners != "1001 alice\n" {
+		t.Errorf("OWNERS = %q, want %q", owners, "1001 alice\n")
 	}
 }
 
@@ -129,6 +129,22 @@ func TestTrunkPushReportsAOneTimeReview(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("stdout doesn't contain %q:\n%s", want, out)
 		}
+	}
+}
+
+// TestTrunkPushRefusesToSendTheGitHubTokenOverPlainHTTP proves a GitHub
+// API override can't make `trunk push` send the token unencrypted to
+// anywhere but this machine.
+func TestTrunkPushRefusesToSendTheGitHubTokenOverPlainHTTP(t *testing.T) {
+	f := publicRegistryPod(t, "published", "")
+	t.Setenv("ZORVOK_GITHUB_API_URL", "http://api.example.com")
+
+	_, errOut, code := run("trunk", "push", "--skip-lint")
+	if code != 1 || !strings.Contains(errOut, "must be an https URL") {
+		t.Fatalf("code = %d, stderr = %q, want a refusal to use plain http", code, errOut)
+	}
+	if f.Forked() {
+		t.Error("trunk push went ahead anyway")
 	}
 }
 

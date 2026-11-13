@@ -30,7 +30,7 @@ func TestStoreSetGetRemove(t *testing.T) {
 		t.Fatal("expected no credentials initially")
 	}
 
-	s.Set("registry.zorvok.dev", Credentials{Email: "dev@example.com", Token: "abcdef123456"})
+	s.Set("registry.zorvok.dev", Credentials{Email: "dev@example.com", Token: "abcdef123456"}) // gitleaks:allow (test fixture, not a secret)
 	c, ok := s.Get("registry.zorvok.dev")
 	if !ok || c.Email != "dev@example.com" {
 		t.Fatalf("got (%+v, %v)", c, ok)
@@ -54,7 +54,7 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.Set("registry.zorvok.dev", Credentials{Email: "dev@example.com", Token: "abcdef123456"})
+	s.Set("registry.zorvok.dev", Credentials{Email: "dev@example.com", Token: "abcdef123456"}) // gitleaks:allow (test fixture, not a secret)
 	if err := s.Save(); err != nil {
 		t.Fatal(err)
 	}

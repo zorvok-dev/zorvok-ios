@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -66,5 +67,21 @@ func TestLoginWithSingleWordNameStillWorks(t *testing.T) {
 	}
 	if gotName != "Jane" {
 		t.Fatalf("registry received name %q, want %q", gotName, "Jane")
+	}
+}
+
+// TestLoginRefusesAPlainHTTPRegistry proves `zorvok login` won't sign up
+// with, or store a session for, a registry it would reach unencrypted.
+func TestLoginRefusesAPlainHTTPRegistry(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Chdir(t.TempDir())
+
+	run("config", "set", "registry_url", "http://registry.example.com", "--global")
+	_, errOut, code := run("login", "dev@example.com")
+	if code != 1 || !strings.Contains(errOut, "must be an https URL") {
+		t.Fatalf("code = %d, stderr = %q, want a refusal to use plain http", code, errOut)
+	}
+	if _, _, code := run("trunk", "me"); code != 1 {
+		t.Fatalf("trunk me exit code = %d, want 1", code)
 	}
 }

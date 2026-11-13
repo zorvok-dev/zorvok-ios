@@ -30,6 +30,9 @@ func loggedInClient() (client *registry.Client, url, token string, err error) {
 	if err != nil {
 		return nil, "", "", err
 	}
+	if err := checkTokenURL("registry_url", url); err != nil {
+		return nil, "", "", err
+	}
 	store, err := zauth.LoadStore()
 	if err != nil {
 		return nil, "", "", err

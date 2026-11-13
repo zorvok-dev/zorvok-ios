@@ -1,11 +1,35 @@
 package cli
 
 import (
+	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strings"
 
 	"github.com/zorvok-dev/zorvok-ios/internal/config"
 )
+
+// checkTokenURL refuses to send a token, or an account's sign-up, to u
+// unless the connection is encrypted: u must be https, or http to this
+// machine (a local dev registry such as defaultRegistryURL, or a test's
+// fake), where nobody else is on the path. what names the setting u came
+// from, for the error.
+func checkTokenURL(what, u string) error {
+	parsed, err := url.Parse(u)
+	if err == nil && parsed.Host != "" {
+		switch strings.ToLower(parsed.Scheme) {
+		case "https":
+			return nil
+		case "http":
+			host := strings.ToLower(parsed.Hostname())
+			if ip := net.ParseIP(host); host == "localhost" || (ip != nil && ip.IsLoopback()) {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("%s %q must be an https URL, since your login is sent to it (plain http is allowed only to this machine, like %s)", what, u, defaultRegistryURL)
+}
 
 // defaultRegistryURL is used when no `registry_url` is configured.
 // There is no publicly hosted Zorvok registry yet (ROADMAP.md Milestone

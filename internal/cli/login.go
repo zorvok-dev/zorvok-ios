@@ -30,6 +30,9 @@ func runLogin(out, errOut io.Writer, args []string) int {
 	if err != nil {
 		return exitErr(errOut, "%v", err)
 	}
+	if err := checkTokenURL("registry_url", url); err != nil {
+		return exitErr(errOut, "%v", err)
+	}
 
 	client := registry.NewClient(url)
 	token, err := client.Register(context.Background(), email, name)

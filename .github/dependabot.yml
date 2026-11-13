@@ -1,0 +1,10 @@
+# Dependabot opens a pull request when a Go dependency has a fix or a
+# new release (security fixes as soon as they're published), so a
+# vulnerable version doesn't sit unnoticed. Turn on "Dependabot alerts"
+# and "Dependabot security updates" in Settings → Code security too.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly

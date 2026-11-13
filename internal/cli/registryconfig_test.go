@@ -60,3 +60,33 @@ func TestRegistryURLStripsTrailingSlash(t *testing.T) {
 		t.Fatalf("got %q, want the trailing slash stripped", url)
 	}
 }
+
+func TestCheckTokenURLAllowsOnlyHTTPSOrThisMachine(t *testing.T) {
+	for _, u := range []string{
+		"https://registry.example.com",
+		"HTTPS://registry.example.com/",
+		defaultRegistryURL,
+		"http://127.0.0.1:8080",
+		"http://127.4.5.6",
+		"http://[::1]:8080",
+		"http://LOCALHOST",
+	} {
+		if err := checkTokenURL("registry_url", u); err != nil {
+			t.Errorf("checkTokenURL(%q) = %v, want nil", u, err)
+		}
+	}
+	for _, u := range []string{
+		"http://registry.example.com",
+		"http://localhost.example.com",
+		"http://127.0.0.1.example.com",
+		"http://10.0.0.5:8080",
+		"ftp://registry.example.com",
+		"registry.example.com",
+		"https://",
+		"",
+	} {
+		if err := checkTokenURL("registry_url", u); err == nil {
+			t.Errorf("checkTokenURL(%q) = nil, want an error", u)
+		}
+	}
+}

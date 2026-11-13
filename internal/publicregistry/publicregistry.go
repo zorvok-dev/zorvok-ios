@@ -29,8 +29,10 @@ import (
 	"os/exec"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // Repo is the public registry's GitHub repository.
@@ -197,19 +199,33 @@ func escapePath(p string) string {
 	return strings.Join(segments, "/")
 }
 
-// Login returns the GitHub username the token belongs to — the identity
-// the registry's OWNERS files list.
-func (c *Client) Login(ctx context.Context) (string, error) {
+// User is a GitHub account. The registry's OWNERS files identify owners
+// by ID, which GitHub never reuses, rather than by username, which can be
+// renamed and then claimed by someone else; the username sits next to it
+// for whoever reads the file.
+type User struct {
+	ID    int64
+	Login string
+}
+
+// OwnerLine is how an OWNERS file lists u.
+func (u User) OwnerLine() string {
+	return fmt.Sprintf("%d %s", u.ID, u.Login)
+}
+
+// User returns the GitHub account the token belongs to.
+func (c *Client) User(ctx context.Context) (User, error) {
 	var user struct {
+		ID    int64  `json:"id"`
 		Login string `json:"login"`
 	}
 	if err := c.do(ctx, http.MethodGet, "/user", nil, &user); err != nil {
-		return "", err
+		return User{}, err
 	}
-	if user.Login == "" {
-		return "", errors.New("GitHub didn't say which account your token belongs to")
+	if user.ID <= 0 || user.Login == "" {
+		return User{}, errors.New("GitHub didn't say which account your token belongs to")
 	}
-	return user.Login, nil
+	return User{ID: user.ID, Login: user.Login}, nil
 }
 
 // Spec is the podspec being published: already linted and converted to
@@ -247,13 +263,13 @@ type pullRequest struct {
 	Merged  bool   `json:"merged"`
 }
 
-// Publish adds spec to the public registry as login. It first checks the
+// Publish adds spec to the public registry as user. It first checks the
 // registry the way its publish workflow will, so a version that already
-// exists or a pod login doesn't own fails right away rather than after a
+// exists or a pod user doesn't own fails right away rather than after a
 // wait. Then it commits the podspec JSON — plus an OWNERS file listing
-// login, for a brand-new pod — to a branch of login's fork, and opens a
+// user, for a brand-new pod — to a branch of user's fork, and opens a
 // pull request, or updates the one an earlier attempt opened.
-func (c *Client) Publish(ctx context.Context, login string, spec Spec) (*Submission, error) {
+func (c *Client) Publish(ctx context.Context, user User, spec Spec) (*Submission, error) {
 	var repo struct {
 		DefaultBranch string `json:"default_branch"`
 	}
@@ -281,8 +297,8 @@ func (c *Client) Publish(ctx context.Context, login string, spec Spec) (*Submiss
 	if err != nil {
 		return nil, err
 	}
-	if ownersExist && !listsOwner(owners, login) {
-		return nil, fmt.Errorf("%s is owned by %s on Zorvok's public registry, and only its owners can publish new versions — ask one of them to add your GitHub username (%s) to %s", spec.Name, strings.Join(ownerList(owners), ", "), login, ownersPath)
+	if ownersExist && !listsOwner(owners, user.ID) {
+		return nil, fmt.Errorf("%s is owned by %s on Zorvok's public registry, and only its owners can publish new versions — ask one of them to add this line, your GitHub user ID and username, to %s:\n  %s", spec.Name, strings.Join(ownerList(owners), ", "), ownersPath, user.OwnerLine())
 	}
 
 	fork, err := c.fork(ctx)
@@ -301,7 +317,7 @@ func (c *Client) Publish(ctx context.Context, login string, spec Spec) (*Submiss
 	// pull request from it having been merged).
 	files := map[string]string{specPath: spec.JSON}
 	if !ownersExist {
-		files[ownersPath] = login + "\n"
+		files[ownersPath] = user.OwnerLine() + "\n"
 	}
 	message := fmt.Sprintf("Publish %s %s", spec.Name, spec.Version)
 	headSHA, err := c.commit(ctx, fork.FullName, baseTree, baseSHA, files, message)
@@ -313,7 +329,7 @@ func (c *Client) Publish(ctx context.Context, login string, spec Spec) (*Submiss
 		return nil, err
 	}
 
-	pr, err := c.openPullRequest(ctx, fork.Owner.Login+":"+branch, base, message, pullRequestBody(spec, login, !ownersExist))
+	pr, err := c.openPullRequest(ctx, fork.Owner.Login+":"+branch, base, message, pullRequestBody(spec, user.Login, !ownersExist))
 	if err != nil {
 		return nil, err
 	}
@@ -343,24 +359,38 @@ func (c *Client) file(ctx context.Context, repo, path, ref string) (string, bool
 	return string(b), true, nil
 }
 
-// listsOwner mirrors the publish workflow's own ownership check (`grep
-// -qxF` in zorvok-specs' validate-pr.sh): login must appear as a whole
-// line, exactly.
-func listsOwner(owners, login string) bool {
+// ownerFields splits an OWNERS file into its lines' fields, "<GitHub
+// user ID> <username>", leaving out # comments and blank lines.
+func ownerFields(owners string) [][]string {
+	var lines [][]string
 	for _, line := range strings.Split(owners, "\n") {
-		if line == login {
+		line, _, _ = strings.Cut(line, "#")
+		if fields := strings.Fields(line); len(fields) > 0 {
+			lines = append(lines, fields)
+		}
+	}
+	return lines
+}
+
+// listsOwner mirrors the publish workflow's own ownership check
+// (owner_ids in zorvok-specs' validate-pr.sh): some line's first field
+// must be id, exactly.
+func listsOwner(owners string, id int64) bool {
+	want := strconv.FormatInt(id, 10)
+	for _, fields := range ownerFields(owners) {
+		if fields[0] == want {
 			return true
 		}
 	}
 	return false
 }
 
+// ownerList names an OWNERS file's owners by username, or by ID for a
+// line without one.
 func ownerList(owners string) []string {
 	var list []string
-	for _, line := range strings.Split(owners, "\n") {
-		if line = strings.TrimSpace(line); line != "" {
-			list = append(list, line)
-		}
+	for _, fields := range ownerFields(owners) {
+		list = append(list, fields[len(fields)-1])
 	}
 	return list
 }
@@ -570,7 +600,7 @@ func (c *Client) verdict(ctx context.Context, sub *Submission) (Verdict, error) 
 			}
 			found = &Verdict{
 				Outcome: Outcome(m[2]),
-				Details: strings.TrimSpace(strings.Replace(comment.Body, m[0], "", 1)),
+				Details: verdictDetails(strings.Replace(comment.Body, m[0], "", 1)),
 			}
 		}
 		if len(comments) < 100 {
@@ -594,6 +624,34 @@ func (c *Client) verdict(ctx context.Context, sub *Submission) (Verdict, error) 
 		return Verdict{Outcome: Rejected, Details: "The pull request was closed without being merged."}, nil
 	}
 	return Verdict{Outcome: Pending}, nil
+}
+
+// rejectedHeading opens the publish workflow's comment on a rejected
+// pull request, above its reasons.
+const rejectedHeading = "This can't be published:"
+
+// verdictDetails turns the text of a verdict comment, after its marker,
+// into something safe to print in a terminal. The reasons can quote a
+// pull request or CocoaPods trunk, so control characters (which could
+// drive the terminal) and bidirectional-text controls (which could make
+// them read differently from what they say) are dropped. The workflow's
+// heading and the indent it quotes reasons with are removed too, since
+// `trunk push` prints its own.
+func verdictDetails(text string) string {
+	text = strings.Map(func(r rune) rune {
+		if r != '\n' && r != '\t' && (unicode.IsControl(r) || unicode.Is(unicode.Bidi_Control, r)) {
+			return -1
+		}
+		return r
+	}, text)
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+	if lines[0] == rejectedHeading {
+		lines = lines[1:]
+	}
+	for i, line := range lines {
+		lines[i] = strings.TrimPrefix(line, "    ")
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
 func sleep(ctx context.Context, d time.Duration) error {

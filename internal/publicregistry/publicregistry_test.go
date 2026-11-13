@@ -14,6 +14,9 @@ import (
 
 const branch = "zorvok-publish/MyPod-1.0.0"
 
+// alice is the account every test's fake GitHub is signed in as.
+var alice = User{ID: githubtest.UserID, Login: "alice"}
+
 func newTestClient(f *githubtest.Fake) *Client {
 	c := NewClient(f.URL, f.Token)
 	c.retryInterval = time.Millisecond
@@ -32,14 +35,14 @@ func myPod(version string) Spec {
 
 // TestPublishNewPodAddsSpecAndOwnersInOneCommit covers a pod's first
 // publish: the podspec JSON lands verbatim at the path the registry's
-// checks expect, OWNERS lists the publisher's exact GitHub login, both
+// checks expect, OWNERS lists the publisher's GitHub user ID and login, both
 // arrive in a single commit on the publisher's fork, and the pull
 // request targets the registry's default branch.
 func TestPublishNewPodAddsSpecAndOwnersInOneCommit(t *testing.T) {
 	f := githubtest.New(t, "alice")
 	spec := myPod("1.0.0")
 
-	sub, err := newTestClient(f).Publish(context.Background(), "alice", spec)
+	sub, err := newTestClient(f).Publish(context.Background(), alice, spec)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,8 +54,8 @@ func TestPublishNewPodAddsSpecAndOwnersInOneCommit(t *testing.T) {
 	if got := files["Specs/MyPod/1.0.0/MyPod.podspec.json"]; got != spec.JSON {
 		t.Errorf("podspec JSON = %q, want it verbatim: %q", got, spec.JSON)
 	}
-	if got := files["Specs/MyPod/OWNERS"]; got != "alice\n" {
-		t.Errorf("OWNERS = %q, want %q", got, "alice\n")
+	if got := files["Specs/MyPod/OWNERS"]; got != "1001 alice\n" {
+		t.Errorf("OWNERS = %q, want %q", got, "1001 alice\n")
 	}
 	if len(files) != 2 {
 		t.Errorf("branch has %d files, want only the podspec and OWNERS: %v", len(files), files)
@@ -82,11 +85,11 @@ func TestPublishNewPodAddsSpecAndOwnersInOneCommit(t *testing.T) {
 // only the new version's podspec is added and OWNERS is left alone.
 func TestPublishNewVersionByAnOwnerAddsOnlyTheSpec(t *testing.T) {
 	f := githubtest.New(t, "alice")
-	f.SetUpstreamFile("Specs/MyPod/OWNERS", "bob\nalice\n")
+	f.SetUpstreamFile("Specs/MyPod/OWNERS", "# maintainers\n1002 bob\n1001 alice\n")
 	f.SetUpstreamFile("Specs/MyPod/1.0.0/MyPod.podspec.json", `{"name": "MyPod", "version": "1.0.0"}`)
 	spec := myPod("1.1.0")
 
-	sub, err := newTestClient(f).Publish(context.Background(), "alice", spec)
+	sub, err := newTestClient(f).Publish(context.Background(), alice, spec)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +98,7 @@ func TestPublishNewVersionByAnOwnerAddsOnlyTheSpec(t *testing.T) {
 	if got := files["Specs/MyPod/1.1.0/MyPod.podspec.json"]; got != spec.JSON {
 		t.Errorf("podspec JSON = %q, want %q", got, spec.JSON)
 	}
-	if got := files["Specs/MyPod/OWNERS"]; got != "bob\nalice\n" {
+	if got := files["Specs/MyPod/OWNERS"]; got != "# maintainers\n1002 bob\n1001 alice\n" {
 		t.Errorf("OWNERS = %q, want it unchanged", got)
 	}
 	if sub.NewPod {
@@ -111,14 +114,15 @@ func TestPublishNewVersionByAnOwnerAddsOnlyTheSpec(t *testing.T) {
 // request — and that the error says who does own it and how to get added.
 func TestPublishRefusesSomeoneWhoDoesNotOwnThePod(t *testing.T) {
 	f := githubtest.New(t, "alice")
-	f.SetUpstreamFile("Specs/MyPod/OWNERS", "bob\n")
+	// "alice" as bob's username, or alice's ID in a comment, isn't alice.
+	f.SetUpstreamFile("Specs/MyPod/OWNERS", "1002 alice # was bob, renamed\n# 1001\n")
 	f.SetUpstreamFile("Specs/MyPod/1.0.0/MyPod.podspec.json", `{"name": "MyPod", "version": "1.0.0"}`)
 
-	_, err := newTestClient(f).Publish(context.Background(), "alice", myPod("1.1.0"))
+	_, err := newTestClient(f).Publish(context.Background(), alice, myPod("1.1.0"))
 	if err == nil {
 		t.Fatal("publish succeeded for someone who isn't listed in OWNERS")
 	}
-	for _, want := range []string{"owned by bob", "alice", "Specs/MyPod/OWNERS"} {
+	for _, want := range []string{"owned by alice on", "1001 alice", "Specs/MyPod/OWNERS"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q doesn't mention %q", err, want)
 		}
@@ -132,10 +136,10 @@ func TestPublishRefusesSomeoneWhoDoesNotOwnThePod(t *testing.T) {
 // versions are immutable from the client's side too.
 func TestPublishRefusesAVersionThatIsAlreadyPublished(t *testing.T) {
 	f := githubtest.New(t, "alice")
-	f.SetUpstreamFile("Specs/MyPod/OWNERS", "alice\n")
+	f.SetUpstreamFile("Specs/MyPod/OWNERS", "1001 alice\n")
 	f.SetUpstreamFile("Specs/MyPod/1.0.0/MyPod.podspec.json", `{"name": "MyPod", "version": "1.0.0"}`)
 
-	_, err := newTestClient(f).Publish(context.Background(), "alice", myPod("1.0.0"))
+	_, err := newTestClient(f).Publish(context.Background(), alice, myPod("1.0.0"))
 	if err == nil || !strings.Contains(err.Error(), "already published") {
 		t.Fatalf("err = %v, want an already-published error", err)
 	}
@@ -150,7 +154,7 @@ func TestPublishWaitsForANewForkToBeReady(t *testing.T) {
 	f := githubtest.New(t, "alice")
 	f.DelayFork(3)
 
-	if _, err := newTestClient(f).Publish(context.Background(), "alice", myPod("1.0.0")); err != nil {
+	if _, err := newTestClient(f).Publish(context.Background(), alice, myPod("1.0.0")); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := f.BranchFiles(branch); !ok {
@@ -166,13 +170,13 @@ func TestPublishUpdatesTheBranchAndPullRequestOfAnEarlierAttempt(t *testing.T) {
 	f := githubtest.New(t, "alice")
 	oldHead := f.SeedBranch(branch, map[string]string{
 		"Specs/MyPod/1.0.0/MyPod.podspec.json": `{"broken": true}`,
-		"Specs/MyPod/OWNERS":                   "alice\n",
+		"Specs/MyPod/OWNERS":                   "1001 alice\n",
 		"Specs/MyPod/1.0.0/leftover.txt":       "from the earlier attempt",
 	})
 	number := f.OpenPull(branch)
 	spec := myPod("1.0.0")
 
-	sub, err := newTestClient(f).Publish(context.Background(), "alice", spec)
+	sub, err := newTestClient(f).Publish(context.Background(), alice, spec)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +204,7 @@ func TestPublishAndWaitForTheWorkflowToMergeIt(t *testing.T) {
 	f.ActAsPublishWorkflow("published", "")
 	c := newTestClient(f)
 
-	sub, err := c.Publish(context.Background(), "alice", myPod("1.0.0"))
+	sub, err := c.Publish(context.Background(), alice, myPod("1.0.0"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +227,7 @@ func TestPublishAndWaitForTheWorkflowToMergeIt(t *testing.T) {
 func TestWaitForVerdictTrustsOnlyTheWorkflowsVerdictOnTheSubmittedCommit(t *testing.T) {
 	f := githubtest.New(t, "alice")
 	c := newTestClient(f)
-	sub, err := c.Publish(context.Background(), "alice", myPod("1.0.0"))
+	sub, err := c.Publish(context.Background(), alice, myPod("1.0.0"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,12 +247,39 @@ func TestWaitForVerdictTrustsOnlyTheWorkflowsVerdictOnTheSubmittedCommit(t *test
 	}
 }
 
+// TestWaitForVerdictCleansTheWorkflowsReasons covers a rejection in the
+// format the publish workflow posts it: the reasons, which can quote a
+// pull request or CocoaPods trunk, come back without the comment's
+// heading and indent, and without control characters that could drive
+// the terminal or bidirectional-text controls that could disguise them.
+func TestWaitForVerdictCleansTheWorkflowsReasons(t *testing.T) {
+	f := githubtest.New(t, "alice")
+	c := newTestClient(f)
+	sub, err := c.Publish(context.Background(), alice, myPod("1.0.0"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := "This can't be published:\n\n" +
+		"    - MyPod already exists on CocoaPods trunk\n" +
+		"      - see \x1b]8;;https://evil.example\x07trunk\x1b]8;;\x07\u202e for its owners\r\n"
+	f.AddComment(sub.Number, githubtest.BotLogin, githubtest.VerdictComment(sub.HeadSHA, "rejected", body))
+
+	v, err := c.WaitForVerdict(context.Background(), sub, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "- MyPod already exists on CocoaPods trunk\n  - see ]8;;https://evil.exampletrunk]8;; for its owners"
+	if v.Outcome != Rejected || v.Details != want {
+		t.Fatalf("verdict = %+v, want rejected with details %q", v, want)
+	}
+}
+
 // TestWaitForVerdictReportsPendingWhenNothingArrivesInTime proves a slow
 // workflow ends the wait cleanly rather than as an error.
 func TestWaitForVerdictReportsPendingWhenNothingArrivesInTime(t *testing.T) {
 	f := githubtest.New(t, "alice")
 	c := newTestClient(f)
-	sub, err := c.Publish(context.Background(), "alice", myPod("1.0.0"))
+	sub, err := c.Publish(context.Background(), alice, myPod("1.0.0"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +296,7 @@ func TestWaitForVerdictReportsPendingWhenNothingArrivesInTime(t *testing.T) {
 func TestWaitForVerdictCountsAPullRequestMergedByHandAsPublished(t *testing.T) {
 	f := githubtest.New(t, "alice")
 	c := newTestClient(f)
-	sub, err := c.Publish(context.Background(), "alice", myPod("1.0.0"))
+	sub, err := c.Publish(context.Background(), alice, myPod("1.0.0"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,9 +308,17 @@ func TestWaitForVerdictCountsAPullRequestMergedByHandAsPublished(t *testing.T) {
 	}
 }
 
-func TestLoginExplainsARejectedToken(t *testing.T) {
+func TestUserReturnsTheAccountsIDAndLogin(t *testing.T) {
 	f := githubtest.New(t, "alice")
-	_, err := NewClient(f.URL, "expired-token").Login(context.Background())
+	user, err := newTestClient(f).User(context.Background())
+	if err != nil || user != alice {
+		t.Fatalf("user = %+v, err = %v, want %+v", user, err, alice)
+	}
+}
+
+func TestUserExplainsARejectedToken(t *testing.T) {
+	f := githubtest.New(t, "alice")
+	_, err := NewClient(f.URL, "expired-token").User(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "gh auth login") {
 		t.Fatalf("err = %v, want a hint to sign in again", err)
 	}
