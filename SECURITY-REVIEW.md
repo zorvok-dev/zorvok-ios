@@ -1,6 +1,6 @@
 # Zorvok security review, November 2026
 
-**Result:** two rounds of review found 27 issues. Every High and Medium one is fixed and covered by a test. Scans of all four repositories found no known-vulnerable dependencies and no real secrets in any commit. The risks that remain are listed under [What's left](#whats-left) instead of being left out.
+**Result:** two rounds of review found 27 issues. All 3 High ones are fixed and covered by tests, and so is every Medium one but R4. That one is the trust CocoaPods trunk itself places in owners' email, which we accept and explain below. Scans of all four repositories found no known-vulnerable dependencies and no real secrets in any commit. The risks that remain are listed under [What's left](#whats-left) instead of being left out.
 
 **What kind of review this is:** the Zorvok team reviewed its own code with standard open-source security scanners, plus an independent AI-assisted review that was given only the code and asked to break it. After the fixes, a second, fresh review attacked them and found more, which are fixed too. **This is not a paid third-party audit.** We publish it so you can check our work: every tool and test below can be re-run with the commands at the end.
 
